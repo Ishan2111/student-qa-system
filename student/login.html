@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Student Login — Q&A System</title>
+  <link rel="stylesheet" href="../assets/css/main.css">
+  <style>
+    .login-card .form-control { background: var(--surface2); }
+    .input-group { position: relative; }
+    .input-group .form-control { padding-right: 44px; }
+    .toggle-password { position:absolute;right:12px;top:50%;transform:translateY(-50%);cursor:pointer;color:var(--text-muted);font-size:18px;background:none;border:none;padding:0; }
+    .feature-item { display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid rgba(255,255,255,0.1);font-size:13px;color:rgba(255,255,255,0.85); }
+    .feature-item:last-child { border-bottom:none; }
+    .feature-icon { width:32px;height:32px;background:rgba(255,255,255,0.15);border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0; }
+  </style>
+</head>
+<body>
+  <div class="login-page">
+    <div style="position:relative;z-index:1;display:flex;gap:32px;align-items:center;width:100%;max-width:860px">
+      <!-- Features panel -->
+      <div style="flex:1;display:none;color:white" id="feature-panel">
+        <h2 style="font-size:26px;font-weight:800;margin-bottom:6px">Student Portal</h2>
+        <p style="opacity:0.8;font-size:14px;margin-bottom:24px">Your daily learning journey</p>
+        <div class="feature-item"><div class="feature-icon">❓</div><span>Answer daily questions from your teachers</span></div>
+        <div class="feature-item"><div class="feature-icon">📊</div><span>Track your progress and scores</span></div>
+        <div class="feature-item"><div class="feature-icon">✅</div><span>View correct answers with explanations</span></div>
+        <div class="feature-item"><div class="feature-icon">🏆</div><span>Check your rank among classmates</span></div>
+      </div>
+
+      <!-- Login Card -->
+      <div class="login-card" style="flex:none;width:100%;max-width:420px;margin:0 auto">
+        <div class="login-logo">🎒</div>
+        <h2 style="text-align:center;font-size:22px;margin-bottom:4px">Student Login</h2>
+        <p style="text-align:center;color:var(--text-muted);font-size:13px;margin-bottom:28px">Sign in with your Student ID or Email</p>
+
+        <form id="loginForm" novalidate>
+          <div class="form-group">
+            <label class="form-label">Student ID or Email</label>
+            <input type="text" id="identifier" class="form-control" placeholder="ST0001 or student@email.com" autocomplete="username" required>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Password</label>
+            <div class="input-group">
+              <input type="password" id="password" class="form-control" placeholder="••••••••" autocomplete="current-password" required>
+              <button type="button" class="toggle-password" id="togglePwd">👁</button>
+            </div>
+          </div>
+
+          <div id="error-msg" style="display:none;background:#fce8e6;color:#c62828;padding:10px 14px;border-radius:8px;font-size:13px;margin-bottom:16px;border-left:3px solid var(--danger)"></div>
+
+          <button type="submit" class="btn btn-primary w-100 btn-lg" id="loginBtn">Sign In</button>
+        </form>
+
+        <div style="text-align:center;margin-top:20px;padding-top:20px;border-top:1px solid var(--border)">
+          <a href="../admin/login.html" style="color:var(--text-muted);font-size:13px">🔐 Admin Login</a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="../assets/js/config.js"></script>
+  <script src="../assets/js/auth.js"></script>
+  <script src="../assets/js/api.js"></script>
+  <script>
+    // Show feature panel on wider screens
+    if (window.innerWidth >= 768) {
+      document.getElementById('feature-panel').style.display = 'block';
+    }
+
+    if (Auth.isLoggedIn() && Auth.getRole() === 'student') {
+      window.location.href = 'dashboard.html';
+    }
+
+    document.getElementById('togglePwd').addEventListener('click', function() {
+      const pwd = document.getElementById('password');
+      const hidden = pwd.type === 'password';
+      pwd.type = hidden ? 'text' : 'password';
+      this.textContent = hidden ? '🙈' : '👁';
+    });
+
+    document.getElementById('loginForm').addEventListener('submit', async function(e) {
+      e.preventDefault();
+      const identifier = document.getElementById('identifier').value.trim();
+      const password = document.getElementById('password').value;
+      const btn = document.getElementById('loginBtn');
+      const errEl = document.getElementById('error-msg');
+
+      if (!identifier || !password) {
+        errEl.textContent = 'Please enter your ID/email and password.';
+        errEl.style.display = 'block';
+        return;
+      }
+
+      btn.disabled = true;
+      btn.innerHTML = '<span style="display:inline-block;width:16px;height:16px;border:2px solid rgba(255,255,255,0.4);border-top-color:white;border-radius:50%;animation:spin 0.8s linear infinite;vertical-align:middle;margin-right:8px"></span> Signing in...';
+      errEl.style.display = 'none';
+
+      try {
+        const result = await API.studentLogin(identifier, password);
+        Auth.setSession(result.data);
+        Toast.success(`Welcome back, ${result.data.name}!`);
+        setTimeout(() => window.location.href = 'dashboard.html', 600);
+      } catch (err) {
+        errEl.textContent = err.message || 'Login failed. Check your credentials.';
+        errEl.style.display = 'block';
+        btn.disabled = false;
+        btn.textContent = 'Sign In';
+      }
+    });
+  </script>
+</body>
+</html>

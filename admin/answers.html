@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Answers — Admin</title>
+  <link rel="stylesheet" href="../assets/css/main.css">
+  <style>
+    .filter-bar { display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:16px; }
+    .filter-select { padding:8px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;background:var(--surface);color:var(--text);outline:none;cursor:pointer; }
+  </style>
+</head>
+<body>
+<div class="app-wrapper">
+  <aside class="sidebar" id="sidebar">
+    <a class="sidebar-brand" href="dashboard.html"><div class="brand-icon">🎓</div><div class="brand-text"><h1>Q&A System</h1><p>Admin Panel</p></div></a>
+    <nav class="sidebar-nav">
+      <span class="nav-section-label">Main</span>
+      <a class="nav-item" href="dashboard.html"><span class="nav-icon">📊</span> Dashboard</a>
+      <a class="nav-item" href="students.html"><span class="nav-icon">👥</span> Students</a>
+      <a class="nav-item" href="questions.html"><span class="nav-icon">❓</span> Questions</a>
+      <a class="nav-item active" href="answers.html"><span class="nav-icon">✅</span> Answers</a>
+      <span class="nav-section-label">Analytics</span>
+      <a class="nav-item" href="reports.html"><span class="nav-icon">📈</span> Reports</a>
+      <span class="nav-section-label">System</span>
+      <a class="nav-item" href="settings.html"><span class="nav-icon">⚙️</span> Settings</a>
+    </nav>
+    <div class="sidebar-footer">
+      <div style="display:flex;align-items:center;gap:10px">
+        <div class="user-avatar" data-user-avatar></div>
+        <div style="flex:1"><div style="font-size:13px;font-weight:600;color:white" data-user-name></div><div style="font-size:11px;opacity:0.7;color:white">Administrator</div></div>
+        <button onclick="Auth.logout('login.html')" style="background:rgba(255,255,255,0.15);border:none;color:white;border-radius:8px;padding:6px 8px;cursor:pointer;font-size:16px">🚪</button>
+      </div>
+    </div>
+  </aside>
+
+  <div class="main-content">
+    <header class="topbar">
+      <button class="topbar-btn" id="sidebar-toggle">☰</button>
+      <div class="topbar-title">Answer Management</div>
+      <div class="topbar-actions" style="margin-left:auto">
+        <button class="topbar-btn" id="theme-toggle">🌙</button>
+        <button class="btn btn-secondary btn-sm" onclick="exportAnswers()">⬇ Export</button>
+        <button class="btn btn-outline-primary btn-sm" onclick="showQuestionReport()">📊 Question Report</button>
+      </div>
+    </header>
+
+    <main class="page-content">
+      <!-- Quick stats -->
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:16px;margin-bottom:24px" id="answer-stats">
+        <div class="stat-card stat-blue"><div class="stat-icon">📝</div><div class="stat-info"><div class="stat-value" id="s-total">—</div><div class="stat-label">Total Answers</div></div></div>
+        <div class="stat-card stat-green"><div class="stat-icon">✅</div><div class="stat-info"><div class="stat-value" id="s-correct">—</div><div class="stat-label">Correct</div></div></div>
+        <div class="stat-card stat-red"><div class="stat-icon">❌</div><div class="stat-info"><div class="stat-value" id="s-wrong">—</div><div class="stat-label">Wrong</div></div></div>
+        <div class="stat-card stat-yellow"><div class="stat-icon">🎯</div><div class="stat-info"><div class="stat-value" id="s-acc">—</div><div class="stat-label">Accuracy</div></div></div>
+      </div>
+
+      <!-- Filter Bar -->
+      <div class="filter-bar">
+        <div class="search-box" style="flex:1;min-width:200px">
+          <span class="search-icon">🔍</span>
+          <input type="text" class="form-control" id="search-student" placeholder="Search by Student ID or Name…">
+        </div>
+        <input type="text" class="filter-select" id="filter-qid" placeholder="Question ID" style="width:130px">
+        <select class="filter-select" id="filter-result" onchange="loadAnswers()">
+          <option value="all">All Results</option>
+          <option value="Correct">Correct</option>
+          <option value="Incorrect">Incorrect</option>
+        </select>
+        <select class="filter-select" id="filter-subject-ans" onchange="loadAnswers()">
+          <option value="all">All Subjects</option>
+        </select>
+        <button class="btn btn-secondary btn-sm" onclick="clearFilters()">✕ Clear</button>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">✅ Submitted Answers <span id="count-label" style="font-weight:400;color:var(--text-muted);font-size:13px"></span></div>
+        </div>
+        <div class="table-wrapper">
+          <table class="table">
+            <thead>
+              <tr>
+                <th>Answer ID</th>
+                <th>Student</th>
+                <th>Question</th>
+                <th>Submitted Answer</th>
+                <th>Result</th>
+                <th>Marks</th>
+                <th>Submitted At</th>
+              </tr>
+            </thead>
+            <tbody id="answers-tbody">
+              <tr><td colspan="7" style="text-align:center;padding:40px"><div class="spinner" style="margin:0 auto"></div></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>
+
+<!-- Question Report Modal -->
+<div class="modal-overlay hidden" id="q-report-modal">
+  <div class="modal-box modal-lg">
+    <div class="modal-header">
+      <div class="modal-title">📊 Question Analysis Report</div>
+      <button class="modal-close" onclick="document.getElementById('q-report-modal').classList.add('hidden')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label class="form-label">Question ID</label>
+        <div style="display:flex;gap:10px">
+          <input type="text" class="form-control" id="report-q-id" placeholder="e.g. Q0001">
+          <button class="btn btn-primary" onclick="loadQuestionReport()">Analyze</button>
+        </div>
+      </div>
+      <div id="q-report-content"></div>
+    </div>
+  </div>
+</div>
+
+<script src="../assets/js/config.js"></script>
+<script src="../assets/js/auth.js"></script>
+<script src="../assets/js/api.js"></script>
+<script>
+if (!Auth.requireAdmin()) throw new Error('Unauthorized');
+populateUserInfo();
+setupThemeToggle();
+Utils.setupSidebar();
+
+CONFIG.SUBJECTS.forEach(s => {
+  const el = document.getElementById('filter-subject-ans');
+  if (el) el.add(new Option(s, s));
+});
+
+let allAnswers = [];
+
+const searchStudent = document.getElementById('search-student');
+const filterQid = document.getElementById('filter-qid');
+searchStudent.addEventListener('input', Utils.debounce(loadAnswers, CONFIG.DEBOUNCE_MS));
+filterQid.addEventListener('input', Utils.debounce(loadAnswers, CONFIG.DEBOUNCE_MS));
+document.getElementById('filter-result').addEventListener('change', loadAnswers);
+
+async function loadAnswers() {
+  const tbody = document.getElementById('answers-tbody');
+  tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:30px"><div class="spinner" style="margin:0 auto"></div></td></tr>';
+  try {
+    // For admin we load all students' answers via progress endpoint
+    const data = await API.getStudentAnswers('all');
+    allAnswers = data.answers || [];
+
+    // Client-side filtering
+    let filtered = allAnswers;
+    const search = searchStudent.value.toLowerCase();
+    const qid = filterQid.value.trim().toUpperCase();
+    const result = document.getElementById('filter-result').value;
+    const subject = document.getElementById('filter-subject-ans').value;
+
+    if (search) filtered = filtered.filter(a => (a.studentId||'').toLowerCase().includes(search) || (a.name||'').toLowerCase().includes(search));
+    if (qid && qid !== 'ALL') filtered = filtered.filter(a => a.questionId === qid);
+    if (result !== 'all') filtered = filtered.filter(a => a.result === result);
+    if (subject !== 'all') filtered = filtered.filter(a => a.subject === subject);
+
+    const correct = filtered.filter(a => a.result === 'Correct').length;
+    document.getElementById('s-total').textContent = filtered.length;
+    document.getElementById('s-correct').textContent = correct;
+    document.getElementById('s-wrong').textContent = filtered.length - correct;
+    document.getElementById('s-acc').textContent = filtered.length > 0 ? Math.round((correct/filtered.length)*100)+'%' : '—';
+    document.getElementById('count-label').textContent = `(${filtered.length} records)`;
+
+    if (!filtered.length) {
+      tbody.innerHTML = `<tr><td colspan="7"><div class="empty-state"><div class="empty-icon">📝</div><h3>No answers found</h3></div></td></tr>`;
+      return;
+    }
+
+    tbody.innerHTML = filtered.map(a => `
+      <tr>
+        <td style="font-size:12px;color:var(--text-muted)">${Utils.escapeHtml(a.answerId||'')}</td>
+        <td>
+          <div style="display:flex;align-items:center;gap:8px">
+            ${Utils.avatar(a.name||a.studentId, 30)}
+            <div>
+              <div style="font-weight:600;font-size:13px">${Utils.escapeHtml(a.name||a.studentId)}</div>
+              <div style="font-size:11px;color:var(--text-muted)">${Utils.escapeHtml(a.studentId||'')}</div>
+            </div>
+          </div>
+        </td>
+        <td>
+          <div style="font-size:12px;color:var(--primary);font-weight:600">${Utils.escapeHtml(a.questionId||'')}</div>
+          <div style="font-size:12px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${Utils.escapeHtml(a.question||'')}">${Utils.escapeHtml(a.question||'')}</div>
+          <span class="badge badge-info" style="margin-top:2px">${Utils.escapeHtml(a.subject||'')}</span>
+        </td>
+        <td style="max-width:150px">
+          <div style="font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${Utils.escapeHtml(a.submittedAnswer||'')}">${Utils.escapeHtml(a.submittedAnswer||'—')}</div>
+          ${a.result==='Incorrect'?`<div style="font-size:11px;color:var(--secondary);margin-top:2px">✓ ${Utils.escapeHtml(a.correctAnswer||'')}</div>`:''}
+        </td>
+        <td>${Utils.resultBadge(a.result)}</td>
+        <td style="font-weight:700;text-align:center">${a.marks??0}</td>
+        <td style="font-size:12px;color:var(--text-muted)">${Utils.formatDateTime(a.submittedAt)}</td>
+      </tr>`).join('');
+  } catch (err) {
+    tbody.innerHTML = `<tr><td colspan="7"><div class="empty-state"><div class="empty-icon">❌</div><h3>${Utils.escapeHtml(err.message)}</h3></div></td></tr>`;
+  }
+}
+
+function clearFilters() {
+  searchStudent.value='';
+  filterQid.value='';
+  document.getElementById('filter-result').value='all';
+  document.getElementById('filter-subject-ans').value='all';
+  loadAnswers();
+}
+
+function exportAnswers() {
+  if (!allAnswers.length) { Toast.warning('No data to export'); return; }
+  Utils.exportCSV('answers_export_'+new Date().toISOString().split('T')[0], allAnswers,
+    ['answerId','studentId','name','questionId','question','subject','submittedAnswer','correctAnswer','result','marks','submittedAt']);
+  Toast.success('Export downloaded');
+}
+
+function showQuestionReport() {
+  document.getElementById('q-report-content').innerHTML = '';
+  document.getElementById('report-q-id').value = '';
+  document.getElementById('q-report-modal').classList.remove('hidden');
+}
+
+async function loadQuestionReport() {
+  const qid = document.getElementById('report-q-id').value.trim();
+  if (!qid) { Toast.warning('Enter a Question ID'); return; }
+  const container = document.getElementById('q-report-content');
+  container.innerHTML = '<div style="text-align:center;padding:30px"><div class="spinner" style="margin:0 auto"></div></div>';
+  try {
+    const d = await API.getReport({ type:'question', questionId: qid });
+    const answerDist = d.answerDistribution || {};
+    container.innerHTML = `
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:16px 0">
+        <div style="text-align:center;padding:14px;background:var(--surface2);border-radius:8px">
+          <div style="font-size:24px;font-weight:800;color:var(--primary)">${d.totalSubmissions}</div>
+          <div style="font-size:12px;color:var(--text-muted)">Submissions</div>
+        </div>
+        <div style="text-align:center;padding:14px;background:#e6f4ea;border-radius:8px">
+          <div style="font-size:24px;font-weight:800;color:var(--secondary)">${d.correct}</div>
+          <div style="font-size:12px;color:var(--text-muted)">Correct</div>
+        </div>
+        <div style="text-align:center;padding:14px;background:#fce8e6;border-radius:8px">
+          <div style="font-size:24px;font-weight:800;color:var(--danger)">${d.wrong}</div>
+          <div style="font-size:12px;color:var(--text-muted)">Wrong</div>
+        </div>
+      </div>
+      <div style="margin-bottom:12px">
+        <div style="display:flex;justify-content:space-between;margin-bottom:6px"><span>Accuracy</span><strong>${d.accuracy}%</strong></div>
+        <div class="progress"><div class="progress-bar ${d.accuracy>=70?'success':d.accuracy>=40?'warning':'danger'}" style="width:${d.accuracy}%"></div></div>
+      </div>
+      <div style="font-weight:600;margin-bottom:8px">Question: <span style="font-weight:400">${Utils.escapeHtml(d.question?.['Question']||'')}</span></div>
+      <div style="font-weight:600;margin-bottom:8px">Correct Answer: <span style="color:var(--secondary)">${Utils.escapeHtml(d.question?.['Correct Answer']||'')}</span></div>
+      <div style="margin-top:16px;font-weight:600;margin-bottom:8px">Answer Distribution</div>
+      ${Object.entries(answerDist).map(([ans, count]) =>
+        `<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border)"><span>${Utils.escapeHtml(ans)}</span><strong>${count}</strong></div>`
+      ).join('') || '<p style="color:var(--text-muted)">No data</p>'}`;
+  } catch (err) {
+    container.innerHTML = `<p style="color:var(--danger)">${err.message}</p>`;
+  }
+}
+
+loadAnswers();
+</script>
+</body>
+</html>

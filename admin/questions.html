@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Questions — Admin</title>
+  <link rel="stylesheet" href="../assets/css/main.css">
+  <style>
+    .q-text { max-width: 300px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .filter-bar { display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-bottom:16px; }
+    .filter-select { padding:8px 12px; border:1.5px solid var(--border); border-radius:8px; font-size:13px; background:var(--surface); color:var(--text); outline:none; cursor:pointer; }
+    .filter-select:focus { border-color:var(--primary); }
+  </style>
+</head>
+<body>
+<div class="app-wrapper">
+  <aside class="sidebar" id="sidebar">
+    <a class="sidebar-brand" href="dashboard.html"><div class="brand-icon">🎓</div><div class="brand-text"><h1>Q&A System</h1><p>Admin Panel</p></div></a>
+    <nav class="sidebar-nav">
+      <span class="nav-section-label">Main</span>
+      <a class="nav-item" href="dashboard.html"><span class="nav-icon">📊</span> Dashboard</a>
+      <a class="nav-item" href="students.html"><span class="nav-icon">👥</span> Students</a>
+      <a class="nav-item active" href="questions.html"><span class="nav-icon">❓</span> Questions</a>
+      <a class="nav-item" href="answers.html"><span class="nav-icon">✅</span> Answers</a>
+      <span class="nav-section-label">Analytics</span>
+      <a class="nav-item" href="reports.html"><span class="nav-icon">📈</span> Reports</a>
+      <span class="nav-section-label">System</span>
+      <a class="nav-item" href="settings.html"><span class="nav-icon">⚙️</span> Settings</a>
+    </nav>
+    <div class="sidebar-footer">
+      <div style="display:flex;align-items:center;gap:10px">
+        <div class="user-avatar" data-user-avatar></div>
+        <div style="flex:1"><div style="font-size:13px;font-weight:600;color:white" data-user-name></div><div style="font-size:11px;opacity:0.7;color:white">Administrator</div></div>
+        <button onclick="Auth.logout('login.html')" style="background:rgba(255,255,255,0.15);border:none;color:white;border-radius:8px;padding:6px 8px;cursor:pointer;font-size:16px">🚪</button>
+      </div>
+    </div>
+  </aside>
+
+  <div class="main-content">
+    <header class="topbar">
+      <button class="topbar-btn" id="sidebar-toggle">☰</button>
+      <div class="topbar-title">Question Management</div>
+      <div class="topbar-actions" style="margin-left:auto">
+        <button class="topbar-btn" id="theme-toggle">🌙</button>
+        <button class="btn btn-primary" onclick="openAddModal()">+ Add Question</button>
+      </div>
+    </header>
+
+    <main class="page-content">
+      <!-- Filters -->
+      <div class="filter-bar">
+        <div class="search-box" style="flex:1;min-width:200px">
+          <span class="search-icon">🔍</span>
+          <input type="text" class="form-control" id="search-input" placeholder="Search questions…">
+        </div>
+        <select class="filter-select" id="filter-subject" onchange="loadQuestions()">
+          <option value="all">All Subjects</option>
+        </select>
+        <select class="filter-select" id="filter-difficulty" onchange="loadQuestions()">
+          <option value="all">All Difficulties</option>
+          <option>Easy</option><option>Medium</option><option>Hard</option>
+        </select>
+        <select class="filter-select" id="filter-status" onchange="loadQuestions()">
+          <option value="all">All Status</option>
+          <option>Draft</option><option>Published</option><option>Archived</option>
+        </select>
+        <input type="date" class="filter-select" id="filter-date-from" onchange="loadQuestions()" placeholder="From">
+        <input type="date" class="filter-select" id="filter-date-to" onchange="loadQuestions()" placeholder="To">
+        <button class="btn btn-secondary btn-sm" onclick="clearFilters()">✕ Clear</button>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">❓ Questions <span id="count-label" style="font-weight:400;color:var(--text-muted);font-size:13px"></span></div>
+          <div style="font-size:13px;color:var(--text-muted)" id="page-info"></div>
+        </div>
+        <div class="table-wrapper">
+          <table class="table">
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Date</th>
+                <th>Subject</th>
+                <th>Question</th>
+                <th>Difficulty</th>
+                <th>Marks</th>
+                <th>Status</th>
+                <th>Blogger</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="questions-tbody">
+              <tr><td colspan="9" style="text-align:center;padding:40px"><div class="spinner" style="margin:0 auto"></div></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="card-body" style="padding:12px 20px">
+          <div class="pagination" id="pagination"></div>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>
+
+<!-- Add/Edit Question Modal -->
+<div class="modal-overlay hidden" id="question-modal">
+  <div class="modal-box modal-lg">
+    <div class="modal-header">
+      <div class="modal-title" id="modal-title">Add Question</div>
+      <button class="modal-close" onclick="closeModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="edit-q-id">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+        <div class="form-group">
+          <label class="form-label">Date *</label>
+          <input type="date" class="form-control" id="f-date">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Subject</label>
+          <select class="form-control" id="f-subject">
+            <option value="">Select Subject</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Chapter</label>
+          <input type="text" class="form-control" id="f-chapter" placeholder="Chapter name or number">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Difficulty</label>
+          <select class="form-control" id="f-difficulty">
+            <option>Easy</option><option selected>Medium</option><option>Hard</option>
+          </select>
+        </div>
+        <div class="form-group" style="grid-column:1/-1">
+          <label class="form-label">Question *</label>
+          <textarea class="form-control" id="f-question" rows="3" placeholder="Enter the question…"></textarea>
+        </div>
+        <div class="form-group" style="grid-column:1/-1">
+          <label class="form-label">Correct Answer *</label>
+          <textarea class="form-control" id="f-answer" rows="2" placeholder="The correct answer…"></textarea>
+        </div>
+        <div class="form-group" style="grid-column:1/-1">
+          <label class="form-label">Explanation</label>
+          <textarea class="form-control" id="f-explanation" rows="2" placeholder="Explanation for the answer (optional)…"></textarea>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Marks</label>
+          <input type="number" class="form-control" id="f-marks" value="1" min="1" max="100">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Status</label>
+          <select class="form-control" id="f-status">
+            <option value="Draft">Draft</option>
+            <option value="Published">Published</option>
+            <option value="Archived">Archived</option>
+          </select>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-primary" id="save-btn" onclick="saveQuestion()">Save Question</button>
+    </div>
+  </div>
+</div>
+
+<!-- View Question Modal -->
+<div class="modal-overlay hidden" id="view-modal">
+  <div class="modal-box modal-lg">
+    <div class="modal-header">
+      <div class="modal-title" id="view-title">Question Details</div>
+      <button class="modal-close" onclick="document.getElementById('view-modal').classList.add('hidden')">✕</button>
+    </div>
+    <div class="modal-body" id="view-body"></div>
+    <div class="modal-footer" id="view-footer">
+      <button class="btn btn-secondary" onclick="document.getElementById('view-modal').classList.add('hidden')">Close</button>
+    </div>
+  </div>
+</div>
+
+<script src="../assets/js/config.js"></script>
+<script src="../assets/js/auth.js"></script>
+<script src="../assets/js/api.js"></script>
+<script>
+if (!Auth.requireAdmin()) throw new Error('Unauthorized');
+populateUserInfo();
+setupThemeToggle();
+Utils.setupSidebar();
+
+let currentPage = 1;
+
+// Populate filters
+CONFIG.SUBJECTS.forEach(s => {
+  const el = document.getElementById('filter-subject');
+  if (el) el.add(new Option(s, s));
+});
+CONFIG.SUBJECTS.forEach(s => {
+  const el = document.getElementById('f-subject');
+  if (el) el.add(new Option(s, s));
+});
+
+const searchInput = document.getElementById('search-input');
+searchInput.addEventListener('input', Utils.debounce(() => { currentPage = 1; loadQuestions(); }, CONFIG.DEBOUNCE_MS));
+
+async function loadQuestions() {
+  const tbody = document.getElementById('questions-tbody');
+  tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:30px"><div class="spinner" style="margin:0 auto"></div></td></tr>';
+  try {
+    const data = await API.getQuestions({
+      search: searchInput.value,
+      subject: document.getElementById('filter-subject').value,
+      difficulty: document.getElementById('filter-difficulty').value,
+      status: document.getElementById('filter-status').value,
+      dateFrom: document.getElementById('filter-date-from').value,
+      dateTo: document.getElementById('filter-date-to').value,
+      page: currentPage,
+      limit: 10
+    });
+
+    document.getElementById('count-label').textContent = `(${data.total} found)`;
+    document.getElementById('page-info').textContent = `Page ${data.page} of ${data.pages}`;
+
+    if (!data.questions.length) {
+      tbody.innerHTML = `<tr><td colspan="9"><div class="empty-state"><div class="empty-icon">❓</div><h3>No questions found</h3><p>Add your first question using the button above.</p></div></td></tr>`;
+      document.getElementById('pagination').innerHTML = '';
+      return;
+    }
+
+    tbody.innerHTML = data.questions.map(q => `
+      <tr>
+        <td><span style="font-weight:700;color:var(--primary)">${Utils.escapeHtml(q['Question ID'])}</span></td>
+        <td style="font-size:13px;white-space:nowrap">${Utils.formatDate(q['Date'])}</td>
+        <td><span class="badge badge-info">${Utils.escapeHtml(q['Subject']||'—')}</span></td>
+        <td><div class="q-text" title="${Utils.escapeHtml(q['Question'])}">${Utils.escapeHtml(q['Question'])}</div>
+            <div style="font-size:11px;color:var(--text-muted)">${Utils.escapeHtml(q['Chapter']||'')}</div></td>
+        <td>${Utils.difficultyBadge(q['Difficulty'])}</td>
+        <td style="font-weight:700;text-align:center">${q['Marks']||1}</td>
+        <td>${Utils.statusBadge(q['Status'])}</td>
+        <td style="text-align:center">${q['Blogger URL'] ? `<a href="${Utils.escapeHtml(q['Blogger URL'])}" target="_blank" class="badge badge-success">🔗 View</a>` : '<span style="color:var(--text-muted);font-size:12px">—</span>'}</td>
+        <td>
+          <div style="display:flex;gap:6px;flex-wrap:wrap">
+            <button class="btn btn-sm btn-outline-primary" onclick='viewQuestion(${JSON.stringify(q)})' title="View">👁</button>
+            <button class="btn btn-sm btn-secondary" onclick='openEditModal(${JSON.stringify(q)})' title="Edit">✏</button>
+            <button class="btn btn-sm btn-success" onclick="publishBlogger('${q['Question ID']}')" title="Publish to Blogger">📝</button>
+            <button class="btn btn-sm btn-danger" onclick="deleteQuestion('${q['Question ID']}','${Utils.escapeHtml(q['Question']).slice(0,30)}')" title="Delete">🗑</button>
+          </div>
+        </td>
+      </tr>`).join('');
+
+    renderPagination(data.page, data.pages);
+  } catch (err) {
+    tbody.innerHTML = `<tr><td colspan="9"><div class="empty-state"><div class="empty-icon">❌</div><h3>${Utils.escapeHtml(err.message)}</h3></div></td></tr>`;
+  }
+}
+
+function renderPagination(page, pages) {
+  if (pages <= 1) { document.getElementById('pagination').innerHTML = ''; return; }
+  let html = `<button class="page-btn" onclick="changePage(${page-1})" ${page<=1?'disabled':''}>‹</button>`;
+  for (let i = Math.max(1, page-2); i <= Math.min(pages, page+2); i++) {
+    html += `<button class="page-btn ${i===page?'active':''}" onclick="changePage(${i})">${i}</button>`;
+  }
+  html += `<button class="page-btn" onclick="changePage(${page+1})" ${page>=pages?'disabled':''}>›</button>`;
+  document.getElementById('pagination').innerHTML = html;
+}
+
+function changePage(p) { currentPage = p; loadQuestions(); }
+function clearFilters() {
+  searchInput.value='';
+  ['filter-subject','filter-difficulty','filter-status'].forEach(id=>document.getElementById(id).value='all');
+  document.getElementById('filter-date-from').value='';
+  document.getElementById('filter-date-to').value='';
+  currentPage=1; loadQuestions();
+}
+
+function openAddModal() {
+  document.getElementById('modal-title').textContent = 'Add New Question';
+  document.getElementById('save-btn').textContent = 'Add Question';
+  document.getElementById('edit-q-id').value = '';
+  document.getElementById('f-date').value = new Date().toISOString().split('T')[0];
+  document.getElementById('f-subject').value = '';
+  document.getElementById('f-chapter').value = '';
+  document.getElementById('f-question').value = '';
+  document.getElementById('f-answer').value = '';
+  document.getElementById('f-explanation').value = '';
+  document.getElementById('f-marks').value = '1';
+  document.getElementById('f-difficulty').value = 'Medium';
+  document.getElementById('f-status').value = 'Draft';
+  document.getElementById('question-modal').classList.remove('hidden');
+}
+
+function openEditModal(q) {
+  document.getElementById('modal-title').textContent = 'Edit Question';
+  document.getElementById('save-btn').textContent = 'Update Question';
+  document.getElementById('edit-q-id').value = q['Question ID'];
+  try { document.getElementById('f-date').value = new Date(q['Date']).toISOString().split('T')[0]; } catch {}
+  document.getElementById('f-subject').value = q['Subject'] || '';
+  document.getElementById('f-chapter').value = q['Chapter'] || '';
+  document.getElementById('f-question').value = q['Question'] || '';
+  document.getElementById('f-answer').value = q['Correct Answer'] || '';
+  document.getElementById('f-explanation').value = q['Explanation'] || '';
+  document.getElementById('f-marks').value = q['Marks'] || '1';
+  document.getElementById('f-difficulty').value = q['Difficulty'] || 'Medium';
+  document.getElementById('f-status').value = q['Status'] || 'Draft';
+  document.getElementById('question-modal').classList.remove('hidden');
+}
+
+function closeModal() { document.getElementById('question-modal').classList.add('hidden'); }
+
+async function saveQuestion() {
+  const question = document.getElementById('f-question').value.trim();
+  const answer = document.getElementById('f-answer').value.trim();
+  if (!question) { Toast.error('Question text is required'); return; }
+  if (!answer) { Toast.error('Correct Answer is required'); return; }
+
+  const qId = document.getElementById('edit-q-id').value;
+  const data = {
+    'Date': document.getElementById('f-date').value,
+    'Subject': document.getElementById('f-subject').value,
+    'Chapter': document.getElementById('f-chapter').value,
+    'Question': question,
+    'Correct Answer': answer,
+    'Explanation': document.getElementById('f-explanation').value,
+    'Difficulty': document.getElementById('f-difficulty').value,
+    'Marks': document.getElementById('f-marks').value,
+    'Status': document.getElementById('f-status').value
+  };
+
+  const btn = document.getElementById('save-btn');
+  btn.disabled = true;
+  try {
+    if (qId) {
+      data['Question ID'] = qId;
+      await API.updateQuestion(data);
+      Toast.success('Question updated');
+    } else {
+      const result = await API.addQuestion(data);
+      Toast.success(`Question added: ${result.data.questionId}`);
+    }
+    closeModal();
+    loadQuestions();
+  } catch (err) {
+    Toast.error(err.message);
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+async function deleteQuestion(id, preview) {
+  if (!await Utils.confirm(`Delete question "${preview}…"?`, 'Delete Question')) return;
+  try {
+    await API.deleteQuestion(id);
+    Toast.success('Question deleted');
+    loadQuestions();
+  } catch (err) {
+    Toast.error(err.message);
+  }
+}
+
+async function publishBlogger(id) {
+  Loading.show('Publishing to Blogger…');
+  try {
+    const result = await API.publishToBlogger(id);
+    Toast.success('Published to Blogger!');
+    if (result.data.bloggerUrl) window.open(result.data.bloggerUrl, '_blank');
+    loadQuestions();
+  } catch (err) {
+    Toast.error(err.message);
+  } finally {
+    Loading.hide();
+  }
+}
+
+function viewQuestion(q) {
+  document.getElementById('view-title').textContent = `${q['Question ID']} — ${q['Subject']||''}`;
+  document.getElementById('view-body').innerHTML = `
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:16px">
+      <div style="padding:12px;background:var(--surface2);border-radius:8px;text-align:center">
+        <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase">Date</div>
+        <div style="font-weight:700;margin-top:4px">${Utils.formatDate(q['Date'])}</div>
+      </div>
+      <div style="padding:12px;background:var(--surface2);border-radius:8px;text-align:center">
+        <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase">Marks</div>
+        <div style="font-weight:700;margin-top:4px">${q['Marks']||1}</div>
+      </div>
+      <div style="padding:12px;background:var(--surface2);border-radius:8px;text-align:center">
+        <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase">Status</div>
+        <div style="margin-top:4px">${Utils.statusBadge(q['Status'])}</div>
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;margin-bottom:16px">${Utils.difficultyBadge(q['Difficulty'])}<span class="badge badge-info">${Utils.escapeHtml(q['Subject']||'')}</span><span class="badge badge-secondary">${Utils.escapeHtml(q['Chapter']||'')}</span></div>
+    <div style="margin-bottom:16px">
+      <div style="font-weight:600;margin-bottom:8px;color:var(--text-muted);font-size:12px;text-transform:uppercase">Question</div>
+      <div style="background:var(--primary-light);border-left:4px solid var(--primary);padding:14px;border-radius:0 8px 8px 0;font-size:16px;line-height:1.6">${Utils.escapeHtml(q['Question'])}</div>
+    </div>
+    <div style="margin-bottom:16px">
+      <div style="font-weight:600;margin-bottom:8px;color:var(--text-muted);font-size:12px;text-transform:uppercase">Correct Answer</div>
+      <div style="background:#e6f4ea;border-left:4px solid var(--secondary);padding:14px;border-radius:0 8px 8px 0;color:#1b5e20">${Utils.escapeHtml(q['Correct Answer'])}</div>
+    </div>
+    ${q['Explanation'] ? `<div><div style="font-weight:600;margin-bottom:8px;color:var(--text-muted);font-size:12px;text-transform:uppercase">Explanation</div><div style="background:var(--surface2);padding:14px;border-radius:8px;font-size:14px;line-height:1.6">${Utils.escapeHtml(q['Explanation'])}</div></div>` : ''}
+    ${q['Blogger URL'] ? `<div style="margin-top:16px"><a href="${Utils.escapeHtml(q['Blogger URL'])}" target="_blank" class="btn btn-outline-primary btn-sm">🔗 View on Blogger</a></div>` : ''}`;
+
+  document.getElementById('view-footer').innerHTML = `
+    <button class="btn btn-secondary" onclick="document.getElementById('view-modal').classList.add('hidden')">Close</button>
+    <button class="btn btn-primary" onclick="document.getElementById('view-modal').classList.add('hidden');openEditModal(${JSON.stringify(q)})">✏ Edit</button>
+    <button class="btn btn-success" onclick="publishBlogger('${q['Question ID']}')">📝 Publish to Blogger</button>`;
+
+  document.getElementById('view-modal').classList.remove('hidden');
+}
+
+loadQuestions();
+</script>
+</body>
+</html>

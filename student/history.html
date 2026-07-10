@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Answer History — Student</title>
+  <link rel="stylesheet" href="../assets/css/main.css">
+  <style>
+    .history-item { border: 1px solid var(--border); border-radius: 12px; padding: 16px; margin-bottom: 12px; transition: box-shadow 0.2s; cursor: pointer; }
+    .history-item:hover { box-shadow: var(--shadow-lg); }
+    .history-item.correct { border-left: 4px solid var(--secondary); }
+    .history-item.wrong   { border-left: 4px solid var(--danger); }
+    .filter-pills { display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px; }
+    .filter-pill { padding:6px 14px;border-radius:20px;border:1.5px solid var(--border);cursor:pointer;font-size:13px;font-weight:500;transition:all 0.2s;background:var(--surface);color:var(--text); }
+    .filter-pill.active { background:var(--primary);color:white;border-color:var(--primary); }
+  </style>
+</head>
+<body>
+<div class="app-wrapper">
+  <aside class="sidebar" id="sidebar">
+    <a class="sidebar-brand" href="dashboard.html"><div class="brand-icon">🎒</div><div class="brand-text"><h1>Q&A Portal</h1><p>Student View</p></div></a>
+    <nav class="sidebar-nav">
+      <span class="nav-section-label">Menu</span>
+      <a class="nav-item" href="dashboard.html"><span class="nav-icon">🏠</span> Dashboard</a>
+      <a class="nav-item" href="question.html"><span class="nav-icon">❓</span> Today's Question</a>
+      <a class="nav-item active" href="history.html"><span class="nav-icon">📜</span> Answer History</a>
+      <a class="nav-item" href="progress.html"><span class="nav-icon">📊</span> My Progress</a>
+      <a class="nav-item" href="profile.html"><span class="nav-icon">👤</span> Profile</a>
+    </nav>
+    <div class="sidebar-footer">
+      <div style="display:flex;align-items:center;gap:10px">
+        <div class="user-avatar" data-user-avatar></div>
+        <div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:600;color:white;overflow:hidden;text-overflow:ellipsis" data-user-name></div><div style="font-size:11px;opacity:0.7;color:white" data-user-id></div></div>
+        <button onclick="Auth.logout('login.html')" style="background:rgba(255,255,255,0.15);border:none;color:white;border-radius:8px;padding:6px 8px;cursor:pointer;font-size:16px">🚪</button>
+      </div>
+    </div>
+  </aside>
+
+  <div class="main-content">
+    <header class="topbar">
+      <button class="topbar-btn" id="sidebar-toggle">☰</button>
+      <div class="topbar-title">Answer History</div>
+      <div class="topbar-actions" style="margin-left:auto">
+        <button class="topbar-btn" id="theme-toggle">🌙</button>
+        <button class="btn btn-sm btn-secondary" onclick="exportHistory()">⬇ Export</button>
+      </div>
+    </header>
+
+    <main class="page-content" style="max-width:800px;margin:0 auto">
+      <!-- Filter pills -->
+      <div class="filter-pills">
+        <button class="filter-pill active" onclick="setFilter('all', this)">All</button>
+        <button class="filter-pill" onclick="setFilter('Correct', this)">✅ Correct</button>
+        <button class="filter-pill" onclick="setFilter('Incorrect', this)">❌ Wrong</button>
+      </div>
+
+      <!-- Subject filter -->
+      <div style="display:flex;gap:10px;margin-bottom:20px;flex-wrap:wrap;align-items:center">
+        <div class="search-box" style="flex:1;min-width:200px">
+          <span class="search-icon">🔍</span>
+          <input type="text" class="form-control" id="search-q" placeholder="Search questions…">
+        </div>
+        <select class="form-control" id="filter-subject" style="width:auto" onchange="renderHistory()">
+          <option value="all">All Subjects</option>
+        </select>
+      </div>
+
+      <!-- Stats bar -->
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:20px">
+        <div class="card" style="padding:16px;text-align:center">
+          <div style="font-size:24px;font-weight:800;color:var(--primary)" id="h-total">0</div>
+          <div style="font-size:12px;color:var(--text-muted)">Total</div>
+        </div>
+        <div class="card" style="padding:16px;text-align:center;background:#e6f4ea">
+          <div style="font-size:24px;font-weight:800;color:var(--secondary)" id="h-correct">0</div>
+          <div style="font-size:12px;color:var(--text-muted)">Correct</div>
+        </div>
+        <div class="card" style="padding:16px;text-align:center;background:#fce8e6">
+          <div style="font-size:24px;font-weight:800;color:var(--danger)" id="h-wrong">0</div>
+          <div style="font-size:12px;color:var(--text-muted)">Wrong</div>
+        </div>
+      </div>
+
+      <!-- Answer list -->
+      <div id="history-list">
+        <div class="empty-state"><div class="spinner" style="margin:0 auto"></div></div>
+      </div>
+    </main>
+  </div>
+</div>
+
+<!-- Detail Modal -->
+<div class="modal-overlay hidden" id="detail-modal">
+  <div class="modal-box">
+    <div class="modal-header">
+      <div class="modal-title" id="detail-title">Answer Detail</div>
+      <button class="modal-close" onclick="document.getElementById('detail-modal').classList.add('hidden')">✕</button>
+    </div>
+    <div class="modal-body" id="detail-body"></div>
+  </div>
+</div>
+
+<script src="../assets/js/config.js"></script>
+<script src="../assets/js/auth.js"></script>
+<script src="../assets/js/api.js"></script>
+<script>
+if (!Auth.requireStudent()) throw new Error('Unauthorized');
+populateUserInfo();
+setupThemeToggle();
+Utils.setupSidebar();
+
+const session = Auth.getSession();
+let allAnswers = [];
+let activeFilter = 'all';
+
+document.getElementById('search-q').addEventListener('input', Utils.debounce(renderHistory, CONFIG.DEBOUNCE_MS));
+document.getElementById('filter-subject').addEventListener('change', renderHistory);
+
+async function loadHistory() {
+  try {
+    const data = await API.getStudentAnswers(session.studentId);
+    allAnswers = data.answers || [];
+
+    // Populate subject filter
+    const subjects = [...new Set(allAnswers.map(a => a.subject).filter(Boolean))];
+    const sel = document.getElementById('filter-subject');
+    subjects.forEach(s => sel.add(new Option(s, s)));
+
+    renderHistory();
+  } catch (err) {
+    document.getElementById('history-list').innerHTML = `<div class="empty-state"><div class="empty-icon">❌</div><h3>Error loading history</h3><p>${err.message}</p></div>`;
+  }
+}
+
+function setFilter(filter, btn) {
+  activeFilter = filter;
+  document.querySelectorAll('.filter-pill').forEach(el => el.classList.remove('active'));
+  btn.classList.add('active');
+  renderHistory();
+}
+
+function renderHistory() {
+  const search = document.getElementById('search-q').value.toLowerCase();
+  const subject = document.getElementById('filter-subject').value;
+
+  let filtered = allAnswers;
+  if (activeFilter !== 'all') filtered = filtered.filter(a => a.result === activeFilter);
+  if (search) filtered = filtered.filter(a => (a.question||'').toLowerCase().includes(search) || (a.subject||'').toLowerCase().includes(search));
+  if (subject !== 'all') filtered = filtered.filter(a => a.subject === subject);
+
+  const correct = filtered.filter(a => a.result === 'Correct').length;
+  document.getElementById('h-total').textContent = filtered.length;
+  document.getElementById('h-correct').textContent = correct;
+  document.getElementById('h-wrong').textContent = filtered.length - correct;
+
+  if (!filtered.length) {
+    document.getElementById('history-list').innerHTML = `<div class="empty-state"><div class="empty-icon">📜</div><h3>No answers found</h3><p>Try changing your filters.</p></div>`;
+    return;
+  }
+
+  document.getElementById('history-list').innerHTML = filtered.map((a, i) => `
+    <div class="history-item ${a.result === 'Correct' ? 'correct' : 'wrong'}" onclick="showDetail(${i})">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px">
+        <div style="flex:1">
+          <div style="font-weight:600;font-size:14px;line-height:1.5;margin-bottom:6px">${Utils.escapeHtml(a.question || '')}</div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px">
+            <span class="badge badge-info">${Utils.escapeHtml(a.subject || '')}</span>
+            ${a.chapter ? `<span class="badge badge-secondary">${Utils.escapeHtml(a.chapter)}</span>` : ''}
+            ${Utils.difficultyBadge(a.difficulty)}
+          </div>
+          <div style="font-size:13px;color:var(--text-muted)">
+            Your answer: <strong style="color:var(--text)">"${Utils.escapeHtml(a.submittedAnswer || '')}"</strong>
+          </div>
+          ${a.result === 'Incorrect' ? `<div style="font-size:13px;color:var(--secondary);margin-top:2px">Correct: <strong>"${Utils.escapeHtml(a.correctAnswer || '')}"</strong></div>` : ''}
+        </div>
+        <div style="text-align:right;flex-shrink:0">
+          ${Utils.resultBadge(a.result)}
+          <div style="font-size:18px;font-weight:800;margin-top:6px;color:${a.result==='Correct'?'var(--secondary)':'var(--danger)'}">${a.marks??0}</div>
+          <div style="font-size:11px;color:var(--text-muted)">marks</div>
+          <div style="font-size:11px;color:var(--text-muted);margin-top:4px">${Utils.timeAgo(a.submittedAt)}</div>
+        </div>
+      </div>
+    </div>`).join('');
+
+  window._filteredAnswers = filtered;
+}
+
+function showDetail(idx) {
+  const a = window._filteredAnswers[idx];
+  if (!a) return;
+  document.getElementById('detail-title').textContent = `${a.questionId} — ${a.subject}`;
+  document.getElementById('detail-body').innerHTML = `
+    <div style="margin-bottom:16px">
+      <div style="font-size:12px;color:var(--text-muted);text-transform:uppercase;margin-bottom:6px">Question</div>
+      <div style="font-size:16px;line-height:1.6;font-weight:500">${Utils.escapeHtml(a.question||'')}</div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">
+      <div style="padding:12px;background:var(--surface2);border-radius:8px">
+        <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;margin-bottom:4px">Subject</div>
+        <div style="font-weight:600">${Utils.escapeHtml(a.subject||'—')}</div>
+      </div>
+      <div style="padding:12px;background:var(--surface2);border-radius:8px">
+        <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;margin-bottom:4px">Difficulty</div>
+        <div>${Utils.difficultyBadge(a.difficulty)}</div>
+      </div>
+      <div style="padding:12px;background:var(--surface2);border-radius:8px">
+        <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;margin-bottom:4px">Date</div>
+        <div style="font-weight:600">${Utils.formatDate(a.date)}</div>
+      </div>
+      <div style="padding:12px;background:var(--surface2);border-radius:8px">
+        <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;margin-bottom:4px">Submitted</div>
+        <div style="font-weight:600;font-size:12px">${Utils.formatDateTime(a.submittedAt)}</div>
+      </div>
+    </div>
+    <div style="padding:14px;background:${a.result==='Correct'?'#e6f4ea':'#fce8e6'};border-radius:10px;margin-bottom:12px">
+      <div style="font-size:12px;color:var(--text-muted);text-transform:uppercase;margin-bottom:6px">Your Answer ${Utils.resultBadge(a.result)}</div>
+      <div style="font-size:15px;font-weight:600">"${Utils.escapeHtml(a.submittedAnswer||'')}"</div>
+      ${a.result==='Incorrect'?`<div style="margin-top:8px;font-size:13px;color:#2e7d32"><strong>Correct answer:</strong> "${Utils.escapeHtml(a.correctAnswer||'')}"</div>`:''}
+    </div>
+    ${a.explanation?`<div style="padding:14px;background:var(--primary-light);border-left:4px solid var(--primary);border-radius:0 8px 8px 0"><div style="font-size:12px;color:var(--text-muted);text-transform:uppercase;margin-bottom:6px">Explanation</div><div style="font-size:14px;line-height:1.7">${Utils.escapeHtml(a.explanation)}</div></div>`:''}
+    <div style="margin-top:16px;display:flex;justify-content:center">
+      <div style="font-size:28px;font-weight:800;color:${a.result==='Correct'?'var(--secondary)':'var(--danger)'}">${a.marks??0} / ${a.maxMarks??1}</div>
+    </div>`;
+  document.getElementById('detail-modal').classList.remove('hidden');
+}
+
+function exportHistory() {
+  const data = window._filteredAnswers || allAnswers;
+  if (!data.length) { Toast.warning('No data to export'); return; }
+  Utils.exportCSV('my_history_'+new Date().toISOString().split('T')[0], data,
+    ['questionId','question','subject','chapter','difficulty','submittedAnswer','correctAnswer','result','marks','submittedAt']);
+  Toast.success('History exported');
+}
+
+loadHistory();
+</script>
+</body>
+</html>

@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Today's Question — Student</title>
+  <link rel="stylesheet" href="../assets/css/main.css">
+  <style>
+    .question-hero { background: linear-gradient(135deg, #1a73e8 0%, #0d47a1 100%); border-radius: 16px; padding: 32px; color: white; margin-bottom: 24px; }
+    .answer-textarea { width:100%;border:2px solid var(--border);border-radius:10px;padding:14px;font-size:15px;line-height:1.6;resize:vertical;min-height:100px;background:var(--surface);color:var(--text);outline:none;transition:border-color 0.2s; }
+    .answer-textarea:focus { border-color:var(--primary); }
+    .submit-btn { background:linear-gradient(135deg,#34a853,#2d9249);color:white;border:none;border-radius:10px;padding:14px 32px;font-size:16px;font-weight:700;cursor:pointer;transition:all 0.2s;width:100%; }
+    .submit-btn:hover { transform:translateY(-1px);box-shadow:0 4px 16px rgba(52,168,83,0.4); }
+    .submit-btn:disabled { opacity:0.6;cursor:not-allowed;transform:none; }
+    .result-card { border-radius: 14px; padding: 24px; margin-top: 20px; }
+    .result-correct { background:#e6f4ea; border: 2px solid #34a853; }
+    .result-wrong   { background:#fce8e6; border: 2px solid #ea4335; }
+    .explanation-box { background:var(--surface2);border-radius:10px;padding:16px;margin-top:16px;border-left:4px solid var(--primary); }
+  </style>
+</head>
+<body>
+<div class="app-wrapper">
+  <aside class="sidebar" id="sidebar">
+    <a class="sidebar-brand" href="dashboard.html"><div class="brand-icon">🎒</div><div class="brand-text"><h1>Q&A Portal</h1><p>Student View</p></div></a>
+    <nav class="sidebar-nav">
+      <span class="nav-section-label">Menu</span>
+      <a class="nav-item" href="dashboard.html"><span class="nav-icon">🏠</span> Dashboard</a>
+      <a class="nav-item active" href="question.html"><span class="nav-icon">❓</span> Today's Question</a>
+      <a class="nav-item" href="history.html"><span class="nav-icon">📜</span> Answer History</a>
+      <a class="nav-item" href="progress.html"><span class="nav-icon">📊</span> My Progress</a>
+      <a class="nav-item" href="profile.html"><span class="nav-icon">👤</span> Profile</a>
+    </nav>
+    <div class="sidebar-footer">
+      <div style="display:flex;align-items:center;gap:10px">
+        <div class="user-avatar" data-user-avatar></div>
+        <div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:600;color:white;overflow:hidden;text-overflow:ellipsis" data-user-name></div><div style="font-size:11px;opacity:0.7;color:white" data-user-id></div></div>
+        <button onclick="Auth.logout('login.html')" style="background:rgba(255,255,255,0.15);border:none;color:white;border-radius:8px;padding:6px 8px;cursor:pointer;font-size:16px">🚪</button>
+      </div>
+    </div>
+  </aside>
+
+  <div class="main-content">
+    <header class="topbar">
+      <button class="topbar-btn" id="sidebar-toggle">☰</button>
+      <div class="topbar-title">Today's Question</div>
+      <div class="topbar-actions" style="margin-left:auto">
+        <button class="topbar-btn" id="theme-toggle">🌙</button>
+        <button class="topbar-btn" onclick="loadQuestion()" title="Refresh">🔄</button>
+      </div>
+    </header>
+
+    <main class="page-content" style="max-width:760px;margin:0 auto">
+      <!-- Loading state -->
+      <div id="loading-state" style="text-align:center;padding:80px">
+        <div class="spinner" style="margin:0 auto 20px"></div>
+        <p style="color:var(--text-muted)">Loading today's question…</p>
+      </div>
+
+      <!-- No question -->
+      <div id="no-question-state" class="card hidden" style="text-align:center;padding:60px">
+        <div style="font-size:64px;margin-bottom:16px">☕</div>
+        <h2>No Question Today</h2>
+        <p style="color:var(--text-muted);margin-top:8px">Your teacher hasn't posted a question yet.</p>
+        <p style="color:var(--text-muted);font-size:13px">Please check back later or contact your teacher.</p>
+        <button class="btn btn-primary" style="margin-top:16px" onclick="loadQuestion()">🔄 Refresh</button>
+      </div>
+
+      <!-- Question content -->
+      <div id="question-content" class="hidden">
+        <!-- Hero -->
+        <div class="question-hero">
+          <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:20px">
+            <div>
+              <div style="font-size:11px;opacity:0.7;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:6px">📅 Today's Question</div>
+              <div style="font-size:13px;opacity:0.8" id="q-meta-info"></div>
+            </div>
+            <div id="q-tags" style="display:flex;gap:6px;flex-wrap:wrap"></div>
+          </div>
+          <div id="q-text" style="font-size:20px;font-weight:700;line-height:1.55"></div>
+        </div>
+
+        <!-- Answer Form -->
+        <div class="card" id="answer-form-card">
+          <div class="card-header">
+            <div class="card-title">✏ Your Answer</div>
+            <div style="font-size:13px;color:var(--text-muted)">Marks: <strong id="q-marks-val">1</strong></div>
+          </div>
+          <div class="card-body">
+            <p style="font-size:13px;color:var(--text-muted);margin-bottom:12px">Type your answer carefully. You can only submit once.</p>
+            <textarea class="answer-textarea" id="answer-text" placeholder="Enter your answer here…"></textarea>
+            <div id="char-count" style="font-size:12px;color:var(--text-muted);text-align:right;margin-top:4px">0 characters</div>
+            <button class="submit-btn" id="submit-btn" onclick="submitAnswer()" style="margin-top:16px">
+              Submit Answer
+            </button>
+          </div>
+        </div>
+
+        <!-- Result (shown after submission) -->
+        <div id="result-area" class="hidden">
+          <div id="result-card">
+            <!-- Populated by JS -->
+          </div>
+
+          <!-- Explanation -->
+          <div class="card" style="margin-top:20px">
+            <div class="card-header"><div class="card-title">💡 Explanation</div></div>
+            <div class="card-body" id="explanation-content"></div>
+          </div>
+
+          <!-- Blogger link -->
+          <div id="blogger-link-area" class="hidden" style="margin-top:16px">
+            <a id="blogger-link" href="#" target="_blank" class="btn btn-outline-primary w-100">
+              📝 Read Full Explanation on Blog →
+            </a>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>
+
+<script src="../assets/js/config.js"></script>
+<script src="../assets/js/auth.js"></script>
+<script src="../assets/js/api.js"></script>
+<script>
+if (!Auth.requireStudent()) throw new Error('Unauthorized');
+populateUserInfo();
+setupThemeToggle();
+Utils.setupSidebar();
+
+const session = Auth.getSession();
+let questionData = null;
+
+// Character count
+document.getElementById('answer-text').addEventListener('input', function() {
+  document.getElementById('char-count').textContent = this.value.length + ' characters';
+});
+
+async function loadQuestion() {
+  document.getElementById('loading-state').classList.remove('hidden');
+  document.getElementById('no-question-state').classList.add('hidden');
+  document.getElementById('question-content').classList.add('hidden');
+
+  try {
+    const q = await API.getTodayQuestion(session.studentId);
+
+    document.getElementById('loading-state').classList.add('hidden');
+
+    if (!q) {
+      document.getElementById('no-question-state').classList.remove('hidden');
+      return;
+    }
+
+    questionData = q;
+    document.getElementById('question-content').classList.remove('hidden');
+
+    document.getElementById('q-text').textContent = q.question;
+    document.getElementById('q-marks-val').textContent = q.marks || 1;
+    document.getElementById('q-meta-info').textContent = `${q.subject || ''}${q.chapter ? ' • ' + q.chapter : ''} • ${q.date || ''}`;
+
+    const diffColors = { Easy: '#4caf50', Medium: '#fb8c00', Hard: '#e53935' };
+    document.getElementById('q-tags').innerHTML = `
+      <span style="background:rgba(255,255,255,0.2);padding:3px 12px;border-radius:20px;font-size:12px">${Utils.escapeHtml(q.subject || '')}</span>
+      <span style="background:${diffColors[q.difficulty]||'rgba(255,255,255,0.15)'};padding:3px 12px;border-radius:20px;font-size:12px">${Utils.escapeHtml(q.difficulty || 'Medium')}</span>
+      <span style="background:rgba(255,255,255,0.2);padding:3px 12px;border-radius:20px;font-size:12px">${q.marks || 1} Mark${q.marks > 1 ? 's' : ''}</span>`;
+
+    if (q.hasSubmitted && q.studentAnswer) {
+      document.getElementById('answer-form-card').classList.add('hidden');
+      showResult(q.studentAnswer, q.correctAnswer, q.explanation, q.bloggerUrl);
+    }
+
+    if (q.bloggerUrl) {
+      document.getElementById('blogger-link').href = q.bloggerUrl;
+    }
+  } catch (err) {
+    document.getElementById('loading-state').classList.add('hidden');
+    document.getElementById('no-question-state').classList.remove('hidden');
+    document.getElementById('no-question-state').querySelector('p').textContent = 'Error: ' + err.message;
+  }
+}
+
+async function submitAnswer() {
+  const answerText = document.getElementById('answer-text').value.trim();
+  if (!answerText) { Toast.warning('Please enter your answer before submitting'); return; }
+  if (!questionData) return;
+
+  if (!await Utils.confirm(`Submit this answer?\n\n"${answerText.slice(0, 100)}${answerText.length > 100 ? '…' : ''}"\n\nYou cannot change it after submission.`, 'Confirm Submission')) return;
+
+  const btn = document.getElementById('submit-btn');
+  btn.disabled = true;
+  btn.textContent = 'Submitting…';
+
+  try {
+    const result = await API.submitAnswer({
+      studentId: session.studentId,
+      questionId: questionData.questionId,
+      answer: answerText
+    });
+
+    document.getElementById('answer-form-card').classList.add('hidden');
+    showResult(result.data, result.data.correctAnswer, result.data.explanation, questionData.bloggerUrl);
+    Toast.show(result.message, result.data.result === 'Correct' ? 'success' : 'error');
+  } catch (err) {
+    Toast.error(err.message);
+    btn.disabled = false;
+    btn.textContent = 'Submit Answer';
+  }
+}
+
+function showResult(answerData, correctAnswer, explanation, bloggerUrl) {
+  const isCorrect = answerData.result === 'Correct';
+  document.getElementById('result-area').classList.remove('hidden');
+  document.getElementById('result-card').innerHTML = `
+    <div class="result-card ${isCorrect ? 'result-correct' : 'result-wrong'}">
+      <div style="font-size:28px;margin-bottom:12px">${isCorrect ? '🎉' : '😔'}</div>
+      <div style="font-size:22px;font-weight:800;margin-bottom:8px;color:${isCorrect ? '#1b5e20' : '#b71c1c'}">${isCorrect ? 'Correct Answer!' : 'Incorrect'}</div>
+      <div style="margin-bottom:10px;font-size:14px;color:#555">
+        <strong>Your answer:</strong> <span style="color:${isCorrect ? '#1b5e20' : '#b71c1c'}">"${Utils.escapeHtml(answerData.submittedAnswer || '')}"</span>
+      </div>
+      ${!isCorrect && correctAnswer ? `<div style="margin-bottom:10px;font-size:14px;color:#555"><strong>Correct answer:</strong> <span style="color:#1b5e20;font-weight:700">"${Utils.escapeHtml(correctAnswer)}"</span></div>` : ''}
+      <div style="display:inline-flex;align-items:center;gap:8px;background:${isCorrect?'#2e7d32':'#c62828'};color:white;padding:8px 16px;border-radius:20px;margin-top:8px">
+        <span style="font-size:18px;font-weight:800">${answerData.marks ?? 0}</span>
+        <span>mark${answerData.marks !== 1 ? 's' : ''} earned</span>
+      </div>
+    </div>`;
+
+  document.getElementById('explanation-content').innerHTML = explanation
+    ? `<p style="line-height:1.7;color:var(--text)">${Utils.escapeHtml(explanation)}</p>`
+    : `<p style="color:var(--text-muted)">No explanation provided for this question.</p>`;
+
+  if (bloggerUrl) {
+    document.getElementById('blogger-link').href = bloggerUrl;
+    document.getElementById('blogger-link-area').classList.remove('hidden');
+  }
+}
+
+loadQuestion();
+</script>
+</body>
+</html>

@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Reports — Admin</title>
+  <link rel="stylesheet" href="../assets/css/main.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <style>
+    .report-tabs { display:flex;gap:8px;flex-wrap:wrap;margin-bottom:24px; }
+    .report-tab { padding:8px 18px;border-radius:20px;border:1.5px solid var(--border);background:var(--surface);cursor:pointer;font-size:13px;font-weight:500;transition:all 0.2s;color:var(--text); }
+    .report-tab.active { background:var(--primary);color:white;border-color:var(--primary); }
+    .rank-medal { font-size:18px; }
+  </style>
+</head>
+<body>
+<div class="app-wrapper">
+  <aside class="sidebar" id="sidebar">
+    <a class="sidebar-brand" href="dashboard.html"><div class="brand-icon">🎓</div><div class="brand-text"><h1>Q&A System</h1><p>Admin Panel</p></div></a>
+    <nav class="sidebar-nav">
+      <span class="nav-section-label">Main</span>
+      <a class="nav-item" href="dashboard.html"><span class="nav-icon">📊</span> Dashboard</a>
+      <a class="nav-item" href="students.html"><span class="nav-icon">👥</span> Students</a>
+      <a class="nav-item" href="questions.html"><span class="nav-icon">❓</span> Questions</a>
+      <a class="nav-item" href="answers.html"><span class="nav-icon">✅</span> Answers</a>
+      <span class="nav-section-label">Analytics</span>
+      <a class="nav-item active" href="reports.html"><span class="nav-icon">📈</span> Reports</a>
+      <span class="nav-section-label">System</span>
+      <a class="nav-item" href="settings.html"><span class="nav-icon">⚙️</span> Settings</a>
+    </nav>
+    <div class="sidebar-footer">
+      <div style="display:flex;align-items:center;gap:10px">
+        <div class="user-avatar" data-user-avatar></div>
+        <div style="flex:1"><div style="font-size:13px;font-weight:600;color:white" data-user-name></div><div style="font-size:11px;opacity:0.7;color:white">Administrator</div></div>
+        <button onclick="Auth.logout('login.html')" style="background:rgba(255,255,255,0.15);border:none;color:white;border-radius:8px;padding:6px 8px;cursor:pointer;font-size:16px">🚪</button>
+      </div>
+    </div>
+  </aside>
+
+  <div class="main-content">
+    <header class="topbar">
+      <button class="topbar-btn" id="sidebar-toggle">☰</button>
+      <div class="topbar-title">Reports & Analytics</div>
+      <div class="topbar-actions" style="margin-left:auto">
+        <button class="topbar-btn" id="theme-toggle">🌙</button>
+        <button class="btn btn-secondary btn-sm" onclick="exportCurrentReport()">⬇ Export</button>
+      </div>
+    </header>
+
+    <main class="page-content">
+      <!-- Tabs -->
+      <div class="report-tabs">
+        <button class="report-tab active" onclick="switchTab('daily')">📅 Daily</button>
+        <button class="report-tab" onclick="switchTab('weekly')">📆 Weekly</button>
+        <button class="report-tab" onclick="switchTab('monthly')">🗓 Monthly</button>
+        <button class="report-tab" onclick="switchTab('subject')">📚 Subject-wise</button>
+        <button class="report-tab" onclick="switchTab('top')">🏆 Top Students</button>
+        <button class="report-tab" onclick="switchTab('low')">📉 Low Performers</button>
+      </div>
+
+      <!-- Report Controls -->
+      <div class="card" style="margin-bottom:20px">
+        <div class="card-body" style="display:flex;gap:12px;flex-wrap:wrap;align-items:center">
+          <div id="daily-controls" class="report-controls">
+            <label class="form-label" style="margin:0 8px 0 0">Date:</label>
+            <input type="date" class="form-control" id="ctrl-date" style="width:auto" value="">
+          </div>
+          <div id="monthly-controls" class="report-controls hidden">
+            <label class="form-label" style="margin:0 8px 0 0">Month:</label>
+            <input type="month" class="form-control" id="ctrl-month" style="width:auto">
+          </div>
+          <div id="subject-controls" class="report-controls hidden">
+            <label class="form-label" style="margin:0 8px 0 0">Subject:</label>
+            <select class="form-control" id="ctrl-subject" style="width:auto">
+              <option value="">All Subjects</option>
+            </select>
+          </div>
+          <button class="btn btn-primary" onclick="loadCurrentReport()">Generate Report</button>
+        </div>
+      </div>
+
+      <!-- Report Output -->
+      <div id="report-output">
+        <div class="empty-state"><div class="empty-icon">📊</div><h3>Select a report type and click Generate</h3></div>
+      </div>
+    </main>
+  </div>
+</div>
+
+<script src="../assets/js/config.js"></script>
+<script src="../assets/js/auth.js"></script>
+<script src="../assets/js/api.js"></script>
+<script>
+if (!Auth.requireAdmin()) throw new Error('Unauthorized');
+populateUserInfo();
+setupThemeToggle();
+Utils.setupSidebar();
+
+CONFIG.SUBJECTS.forEach(s => document.getElementById('ctrl-subject').add(new Option(s, s)));
+
+// Set default date to today
+document.getElementById('ctrl-date').value = new Date().toISOString().split('T')[0];
+const now = new Date();
+document.getElementById('ctrl-month').value = now.getFullYear() + '-' + String(now.getMonth()+1).padStart(2,'0');
+
+let currentTab = 'daily';
+let currentReportData = null;
+let barChart = null;
+
+function switchTab(tab) {
+  currentTab = tab;
+  document.querySelectorAll('.report-tab').forEach((el, i) => {
+    el.classList.toggle('active', ['daily','weekly','monthly','subject','top','low'][i] === tab);
+  });
+  document.querySelectorAll('.report-controls').forEach(el => el.classList.add('hidden'));
+
+  if (tab === 'daily') document.getElementById('daily-controls').classList.remove('hidden');
+  else if (tab === 'monthly') document.getElementById('monthly-controls').classList.remove('hidden');
+  else if (tab === 'subject') document.getElementById('subject-controls').classList.remove('hidden');
+
+  document.getElementById('report-output').innerHTML = '<div class="empty-state"><div class="empty-icon">📊</div><h3>Click "Generate Report"</h3></div>';
+  currentReportData = null;
+  if (barChart) { barChart.destroy(); barChart = null; }
+}
+
+async function loadCurrentReport() {
+  const output = document.getElementById('report-output');
+  output.innerHTML = '<div style="text-align:center;padding:60px"><div class="spinner" style="margin:0 auto"></div><div style="margin-top:16px;color:var(--text-muted)">Generating report…</div></div>';
+
+  try {
+    const params = { type: currentTab };
+    if (currentTab === 'daily') params.date = document.getElementById('ctrl-date').value;
+    if (currentTab === 'monthly') params.month = document.getElementById('ctrl-month').value;
+    if (currentTab === 'subject') params.subject = document.getElementById('ctrl-subject').value;
+
+    const data = await API.getReport(params);
+    currentReportData = data;
+    renderReport(currentTab, data);
+  } catch (err) {
+    output.innerHTML = `<div class="empty-state"><div class="empty-icon">❌</div><h3>Error</h3><p>${Utils.escapeHtml(err.message)}</p></div>`;
+  }
+}
+
+function renderReport(type, d) {
+  const output = document.getElementById('report-output');
+  if (barChart) { barChart.destroy(); barChart = null; }
+
+  switch (type) {
+    case 'daily': renderDailyReport(d, output); break;
+    case 'weekly': renderWeeklyReport(d, output); break;
+    case 'monthly': renderMonthlyReport(d, output); break;
+    case 'subject': renderSubjectReport(d, output); break;
+    case 'top':
+    case 'low': renderLeaderboardReport(d, output, type === 'top'); break;
+  }
+}
+
+function renderDailyReport(d, el) {
+  el.innerHTML = `
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:16px;margin-bottom:24px">
+      <div class="stat-card stat-blue"><div class="stat-icon">📅</div><div class="stat-info"><div class="stat-value">${d.date||'—'}</div><div class="stat-label">Date</div></div></div>
+      <div class="stat-card stat-blue"><div class="stat-icon">👥</div><div class="stat-info"><div class="stat-value">${d.totalStudents||0}</div><div class="stat-label">Active Students</div></div></div>
+      <div class="stat-card stat-green"><div class="stat-icon">📝</div><div class="stat-info"><div class="stat-value">${d.submitted||0}</div><div class="stat-label">Submitted</div></div></div>
+      <div class="stat-card stat-red"><div class="stat-icon">⏳</div><div class="stat-info"><div class="stat-value">${d.pending||0}</div><div class="stat-label">Pending</div></div></div>
+      <div class="stat-card stat-green"><div class="stat-icon">✅</div><div class="stat-info"><div class="stat-value">${d.correctAnswers||0}</div><div class="stat-label">Correct</div></div></div>
+      <div class="stat-card stat-red"><div class="stat-icon">❌</div><div class="stat-info"><div class="stat-value">${d.wrongAnswers||0}</div><div class="stat-label">Wrong</div></div></div>
+    </div>
+    ${d.questions?.length ? `<div class="card" style="margin-bottom:20px">
+      <div class="card-header"><div class="card-title">📋 Today's Questions</div></div>
+      <div class="card-body p-0">
+        ${d.questions.map(q => `<div style="padding:14px 20px;border-bottom:1px solid var(--border)">
+          <div style="font-weight:600;margin-bottom:4px">${Utils.escapeHtml(q['Question ID']||'')} — ${Utils.escapeHtml(q['Subject']||'')}</div>
+          <div style="font-size:14px">${Utils.escapeHtml(q['Question']||'')}</div>
+          <div style="font-size:12px;color:var(--text-muted);margin-top:4px">Answer: ${Utils.escapeHtml(q['Correct Answer']||'')}</div>
+        </div>`).join('')}
+      </div>
+    </div>` : ''}
+    ${d.pendingStudents?.length ? `<div class="card">
+      <div class="card-header"><div class="card-title">⏳ Pending Students (${d.pending})</div></div>
+      <div class="table-wrapper">
+        <table class="table">
+          <thead><tr><th>Student ID</th><th>Name</th><th>Class</th></tr></thead>
+          <tbody>${d.pendingStudents.map(s => `<tr><td>${Utils.escapeHtml(s.studentId)}</td><td>${Utils.escapeHtml(s.name)}</td><td>Class ${Utils.escapeHtml(s.class)}</td></tr>`).join('')}</tbody>
+        </table>
+      </div>
+    </div>` : ''}`;
+}
+
+function renderWeeklyReport(d, el) {
+  const days = Object.entries(d.dailyBreakdown || {});
+  el.innerHTML = `
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:16px;margin-bottom:24px">
+      <div class="stat-card stat-blue"><div class="stat-icon">📅</div><div class="stat-info"><div class="stat-value">${d.totalQuestions||0}</div><div class="stat-label">Questions</div></div></div>
+      <div class="stat-card stat-blue"><div class="stat-icon">📝</div><div class="stat-info"><div class="stat-value">${d.totalSubmissions||0}</div><div class="stat-label">Submissions</div></div></div>
+      <div class="stat-card stat-green"><div class="stat-icon">✅</div><div class="stat-info"><div class="stat-value">${d.correctAnswers||0}</div><div class="stat-label">Correct</div></div></div>
+      <div class="stat-card stat-yellow"><div class="stat-icon">🎯</div><div class="stat-info"><div class="stat-value">${d.participationRate||0}%</div><div class="stat-label">Participation</div></div></div>
+    </div>
+    <div class="card">
+      <div class="card-header"><div class="card-title">📊 Daily Breakdown</div></div>
+      <div class="card-body">
+        <div style="height:250px"><canvas id="weekly-chart"></canvas></div>
+      </div>
+    </div>`;
+
+  setTimeout(() => {
+    barChart = new Chart(document.getElementById('weekly-chart'), {
+      type: 'bar',
+      data: {
+        labels: days.map(([d]) => d),
+        datasets: [
+          { label: 'Submissions', data: days.map(([,v]) => v.submissions), backgroundColor: 'rgba(26,115,232,0.7)', borderRadius: 5 },
+          { label: 'Correct', data: days.map(([,v]) => v.correct), backgroundColor: 'rgba(52,168,83,0.7)', borderRadius: 5 }
+        ]
+      },
+      options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position:'bottom' } }, scales: { y: { beginAtZero: true, ticks:{stepSize:1} } } }
+    });
+  }, 100);
+}
+
+function renderMonthlyReport(d, el) {
+  el.innerHTML = `
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:16px;margin-bottom:24px">
+      <div class="stat-card stat-blue"><div class="stat-icon">🗓</div><div class="stat-info"><div class="stat-value">${d.month||'—'}</div><div class="stat-label">Period</div></div></div>
+      <div class="stat-card stat-blue"><div class="stat-icon">❓</div><div class="stat-info"><div class="stat-value">${d.totalQuestions||0}</div><div class="stat-label">Questions</div></div></div>
+      <div class="stat-card stat-green"><div class="stat-icon">📝</div><div class="stat-info"><div class="stat-value">${d.totalSubmissions||0}</div><div class="stat-label">Submissions</div></div></div>
+      <div class="stat-card stat-green"><div class="stat-icon">✅</div><div class="stat-info"><div class="stat-value">${d.correctAnswers||0}</div><div class="stat-label">Correct</div></div></div>
+    </div>
+    <div class="card">
+      <div class="card-header"><div class="card-title">🏆 Monthly Leaderboard</div><button class="btn btn-sm btn-secondary" onclick="exportLeaderboard()">⬇ Export</button></div>
+      <div class="table-wrapper">
+        <table class="table">
+          <thead><tr><th>Rank</th><th>Student</th><th>Class</th><th>Submitted</th><th>Correct</th><th>Score</th></tr></thead>
+          <tbody>${(d.leaderboard||[]).map(s => `<tr>
+            <td><span class="rank-medal">${s.rank<=3?['🥇','🥈','🥉'][s.rank-1]:'#'+s.rank}</span></td>
+            <td><div style="display:flex;align-items:center;gap:8px">${Utils.avatar(s.name,30)}<span>${Utils.escapeHtml(s.name)}</span></div></td>
+            <td>Class ${Utils.escapeHtml(s.class||'')}</td>
+            <td>${s.submitted}</td>
+            <td><span style="color:var(--secondary);font-weight:600">${s.correct}</span></td>
+            <td><span style="font-weight:700">${s.score}</span></td>
+          </tr>`).join('')}</tbody>
+        </table>
+      </div>
+    </div>`;
+}
+
+function renderSubjectReport(d, el) {
+  const accuracy = d.questions?.length ? Math.round(d.questions.reduce((s,q)=>s+(q.accuracy||0),0)/d.questions.length) : 0;
+  el.innerHTML = `
+    <div style="margin-bottom:20px;display:flex;gap:12px;flex-wrap:wrap">
+      <div class="stat-card stat-blue" style="flex:1;min-width:140px"><div class="stat-icon">📚</div><div class="stat-info"><div class="stat-value">${d.totalQuestions||0}</div><div class="stat-label">Questions</div></div></div>
+      <div class="stat-card stat-yellow" style="flex:1;min-width:140px"><div class="stat-icon">🎯</div><div class="stat-info"><div class="stat-value">${accuracy}%</div><div class="stat-label">Avg Accuracy</div></div></div>
+    </div>
+    <div class="card">
+      <div class="card-header"><div class="card-title">📊 Question Analysis — ${Utils.escapeHtml(d.subject||'All')}</div></div>
+      <div class="table-wrapper">
+        <table class="table">
+          <thead><tr><th>Q ID</th><th>Date</th><th>Chapter</th><th>Question</th><th>Submissions</th><th>Correct</th><th>Wrong</th><th>Accuracy</th></tr></thead>
+          <tbody>${(d.questions||[]).map(q => `<tr>
+            <td style="color:var(--primary);font-weight:600">${Utils.escapeHtml(q.questionId)}</td>
+            <td style="font-size:12px">${Utils.formatDate(q.date)}</td>
+            <td><span class="badge badge-secondary">${Utils.escapeHtml(q.chapter||'—')}</span></td>
+            <td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${Utils.escapeHtml(q.question)}</td>
+            <td style="text-align:center">${q.totalSubmissions}</td>
+            <td style="text-align:center;color:var(--secondary);font-weight:600">${q.correct}</td>
+            <td style="text-align:center;color:var(--danger)">${q.wrong}</td>
+            <td>
+              <div style="display:flex;align-items:center;gap:8px">
+                <div class="progress" style="flex:1;height:6px"><div class="progress-bar ${q.accuracy>=70?'success':q.accuracy>=40?'warning':'danger'}" style="width:${q.accuracy}%"></div></div>
+                <span style="font-size:12px;font-weight:600;min-width:35px">${q.accuracy}%</span>
+              </div>
+            </td>
+          </tr>`).join('')}</tbody>
+        </table>
+      </div>
+    </div>`;
+}
+
+function renderLeaderboardReport(d, el, isTop) {
+  el.innerHTML = `
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:20px">
+      ${(d.students||[]).slice(0,3).map((s, i) => `
+        <div class="card" style="text-align:center;padding:20px">
+          <div style="font-size:36px;margin-bottom:8px">${['🥇','🥈','🥉'][i]}</div>
+          ${Utils.avatar(s.name, 48)}
+          <div style="font-weight:700;margin-top:8px">${Utils.escapeHtml(s.name)}</div>
+          <div style="font-size:12px;color:var(--text-muted)">${s.studentId} • Class ${s.class||''}</div>
+          <div style="font-size:24px;font-weight:800;color:${s.percentage>=70?'var(--secondary)':'var(--primary)'};margin-top:8px">${s.percentage}%</div>
+          <div style="font-size:12px;color:var(--text-muted)">${s.correct} correct / ${s.attempted} attempted</div>
+        </div>`).join('')}
+    </div>
+    <div class="card">
+      <div class="card-header"><div class="card-title">${isTop?'🏆 Top':'📉 Low'} Performers (All Students)</div><button class="btn btn-sm btn-secondary" onclick="exportLeaderboard()">⬇ Export</button></div>
+      <div class="table-wrapper">
+        <table class="table">
+          <thead><tr><th>Rank</th><th>Student</th><th>Class</th><th>Attempted</th><th>Correct</th><th>Wrong</th><th>Score</th><th>Progress</th></tr></thead>
+          <tbody>${(d.students||[]).map(s => `<tr>
+            <td><span style="font-weight:700;color:${s.rank<=3?'var(--warning)':'var(--text-muted)'}">${s.rank<=3?['🥇','🥈','🥉'][s.rank-1]:'#'+s.rank}</span></td>
+            <td><div style="display:flex;align-items:center;gap:8px">${Utils.avatar(s.name,30)}<div><div style="font-weight:600;font-size:13px">${Utils.escapeHtml(s.name)}</div><div style="font-size:11px;color:var(--text-muted)">${s.studentId}</div></div></div></td>
+            <td><span class="badge badge-info">Class ${s.class||''}</span></td>
+            <td style="text-align:center">${s.attempted||0}</td>
+            <td style="text-align:center;color:var(--secondary);font-weight:600">${s.correct||0}</td>
+            <td style="text-align:center;color:var(--danger)">${s.wrong||0}</td>
+            <td><span style="font-size:18px;font-weight:800;color:${s.percentage>=70?'var(--secondary)':s.percentage>=40?'#f57f17':'var(--danger)'}">${s.percentage}%</span></td>
+            <td style="min-width:100px"><div class="progress"><div class="progress-bar ${s.percentage>=70?'success':s.percentage>=40?'warning':'danger'}" style="width:${s.percentage}%"></div></div></td>
+          </tr>`).join('')}</tbody>
+        </table>
+      </div>
+    </div>`;
+}
+
+function exportCurrentReport() {
+  if (!currentReportData) { Toast.warning('Generate a report first'); return; }
+  const students = currentReportData.students || currentReportData.leaderboard || [];
+  if (students.length) {
+    Utils.exportCSV('report_' + currentTab + '_' + new Date().toISOString().split('T')[0],
+      students, ['rank','studentId','name','class','attempted','correct','wrong','percentage','score','marks'].filter(k => students[0]?.[k] !== undefined));
+    Toast.success('Report exported');
+  } else {
+    Toast.warning('No tabular data to export for this report type');
+  }
+}
+
+function exportLeaderboard() { exportCurrentReport(); }
+
+// Auto-load on page load
+loadCurrentReport();
+</script>
+</body>
+</html>

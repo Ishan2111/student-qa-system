@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard — Admin</title>
+  <link rel="stylesheet" href="../assets/css/main.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <style>
+    .stats-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 16px; margin-bottom: 24px; }
+    .charts-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 24px; }
+    .chart-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--border-r); padding: 20px; box-shadow: var(--shadow); }
+    .chart-card h3 { font-size: 15px; margin-bottom: 16px; color: var(--text); }
+    .bottom-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+    .today-q-card { background: linear-gradient(135deg, var(--primary), var(--primary-dark)); color: white; border-radius: var(--border-r); padding: 20px; margin-bottom: 24px; }
+    @media (max-width: 900px) { .charts-grid, .bottom-grid { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+<div class="app-wrapper">
+  <!-- Sidebar -->
+  <aside class="sidebar" id="sidebar">
+    <a class="sidebar-brand" href="dashboard.html">
+      <div class="brand-icon">🎓</div>
+      <div class="brand-text">
+        <h1 id="school-name">Q&A System</h1>
+        <p>Admin Panel</p>
+      </div>
+    </a>
+    <nav class="sidebar-nav">
+      <span class="nav-section-label">Main</span>
+      <a class="nav-item active" href="dashboard.html"><span class="nav-icon">📊</span> Dashboard</a>
+      <a class="nav-item" href="students.html"><span class="nav-icon">👥</span> Students</a>
+      <a class="nav-item" href="questions.html"><span class="nav-icon">❓</span> Questions</a>
+      <a class="nav-item" href="answers.html"><span class="nav-icon">✅</span> Answers</a>
+
+      <span class="nav-section-label">Analytics</span>
+      <a class="nav-item" href="reports.html"><span class="nav-icon">📈</span> Reports</a>
+
+      <span class="nav-section-label">System</span>
+      <a class="nav-item" href="settings.html"><span class="nav-icon">⚙️</span> Settings</a>
+    </nav>
+    <div class="sidebar-footer">
+      <div class="d-flex align-items-center gap-2" style="gap:10px">
+        <div class="user-avatar" data-user-avatar></div>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:13px;font-weight:600;color:white;truncate" data-user-name></div>
+          <div style="font-size:11px;opacity:0.7;color:white">Administrator</div>
+        </div>
+        <button onclick="Auth.logout('login.html')" title="Logout" style="background:rgba(255,255,255,0.15);border:none;color:white;border-radius:8px;padding:6px 8px;cursor:pointer;font-size:16px">🚪</button>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Main -->
+  <div class="main-content">
+    <header class="topbar">
+      <button class="topbar-btn" id="sidebar-toggle">☰</button>
+      <div>
+        <div class="topbar-title">Dashboard</div>
+        <div class="topbar-subtitle" id="date-display"></div>
+      </div>
+      <div class="topbar-actions" style="margin-left:auto">
+        <button class="topbar-btn" id="theme-toggle" title="Toggle theme">🌙</button>
+        <button class="topbar-btn" onclick="loadDashboard()" title="Refresh">🔄</button>
+        <div class="user-avatar" data-user-avatar style="cursor:default"></div>
+      </div>
+    </header>
+
+    <main class="page-content">
+      <!-- Today's Question Banner -->
+      <div id="today-q-banner" class="today-q-card hidden">
+        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px">
+          <div>
+            <div style="font-size:12px;opacity:0.8;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px">📅 Today's Question</div>
+            <div style="font-size:18px;font-weight:600" id="today-q-text"></div>
+            <div style="font-size:13px;opacity:0.8;margin-top:4px" id="today-q-meta"></div>
+          </div>
+          <a href="questions.html" style="background:rgba(255,255,255,0.2);color:white;padding:8px 16px;border-radius:8px;font-size:13px;font-weight:600;white-space:nowrap;text-decoration:none">Manage Questions →</a>
+        </div>
+      </div>
+
+      <!-- Stats Grid -->
+      <div class="stats-grid" id="stats-grid">
+        <!-- Populated by JS -->
+        <div class="stat-card skeleton" style="height:100px"></div>
+        <div class="stat-card skeleton" style="height:100px"></div>
+        <div class="stat-card skeleton" style="height:100px"></div>
+        <div class="stat-card skeleton" style="height:100px"></div>
+        <div class="stat-card skeleton" style="height:100px"></div>
+        <div class="stat-card skeleton" style="height:100px"></div>
+      </div>
+
+      <!-- Charts -->
+      <div class="charts-grid">
+        <div class="chart-card">
+          <h3>📊 Monthly Submissions (Last 6 months)</h3>
+          <div class="chart-container" style="height:240px">
+            <canvas id="monthlyChart"></canvas>
+          </div>
+        </div>
+        <div class="chart-card">
+          <h3>🎯 Answer Distribution</h3>
+          <div class="chart-container" style="height:240px">
+            <canvas id="answerChart"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <!-- Bottom row -->
+      <div class="bottom-grid">
+        <!-- Top Students -->
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">🏆 Top Performers</div>
+            <a href="reports.html?type=top" class="btn btn-sm btn-outline-primary">View All</a>
+          </div>
+          <div class="card-body p-0">
+            <div id="top-students-list">
+              <div class="empty-state"><div class="empty-icon">⏳</div><p>Loading...</p></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Subject Stats -->
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">📚 Subject Overview</div>
+            <a href="questions.html" class="btn btn-sm btn-outline-primary">Questions</a>
+          </div>
+          <div class="card-body p-0">
+            <div id="subject-list">
+              <div class="empty-state"><div class="empty-icon">⏳</div><p>Loading...</p></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>
+
+<script src="../assets/js/config.js"></script>
+<script src="../assets/js/auth.js"></script>
+<script src="../assets/js/api.js"></script>
+<script>
+if (!Auth.requireAdmin()) throw new Error('Unauthorized');
+populateUserInfo();
+setupThemeToggle();
+Utils.setupSidebar();
+
+// Date display
+const now = new Date();
+document.getElementById('date-display').textContent = now.toLocaleDateString('en-IN', { weekday:'long', day:'2-digit', month:'long', year:'numeric' });
+
+let monthlyChart, answerChart;
+
+async function loadDashboard() {
+  try {
+    const data = await API.getDashboard();
+
+    // School name
+    document.querySelectorAll('#school-name').forEach(el => el.textContent = data.schoolName || CONFIG.SCHOOL_NAME);
+
+    // Today's Q
+    if (data.todayQuestion) {
+      document.getElementById('today-q-text').textContent = data.todayQuestion.question;
+      document.getElementById('today-q-meta').textContent = `${data.todayQuestion.subject} • ${data.todaySubmissions} submission(s) today`;
+      document.getElementById('today-q-banner').classList.remove('hidden');
+    }
+
+    // Stats
+    const stats = [
+      { icon:'👥', label:'Total Students', value: data.totalStudents, sub: `${data.activeStudents} active`, color:'blue', link:'students.html' },
+      { icon:'✅', label:'Active Students', value: data.activeStudents, sub: `${data.inactiveStudents} inactive`, color:'green', link:'students.html?status=Active' },
+      { icon:'❓', label:'Published Questions', value: data.publishedQuestions, sub: `${data.totalQuestions} total`, color:'purple', link:'questions.html' },
+      { icon:'📝', label:'Total Submissions', value: data.totalAnswers, sub: `${data.todaySubmissions} today`, color:'teal', link:'answers.html' },
+      { icon:'🎯', label:'Correct Answers', value: data.correctAnswers, sub: `${data.averageScore}% accuracy`, color:'yellow', link:'reports.html' },
+      { icon:'❌', label:'Wrong Answers', value: data.wrongAnswers, sub: `of ${data.totalAnswers} answers`, color:'red', link:'reports.html' },
+    ];
+
+    document.getElementById('stats-grid').innerHTML = stats.map(s => `
+      <a class="stat-card stat-${s.color}" href="${s.link}" style="text-decoration:none;color:inherit">
+        <div class="stat-icon"><span>${s.icon}</span></div>
+        <div class="stat-info">
+          <div class="stat-value">${s.value ?? 0}</div>
+          <div class="stat-label">${s.label}</div>
+          <div class="stat-change" style="color:var(--text-muted);font-size:12px">${s.sub}</div>
+        </div>
+      </a>
+    `).join('');
+
+    // Monthly chart
+    const months = data.monthlyStats || [];
+    if (monthlyChart) monthlyChart.destroy();
+    monthlyChart = new Chart(document.getElementById('monthlyChart'), {
+      type: 'bar',
+      data: {
+        labels: months.map(m => m.label),
+        datasets: [
+          { label: 'Submissions', data: months.map(m => m.submissions), backgroundColor: 'rgba(26,115,232,0.7)', borderRadius: 6 },
+          { label: 'Correct', data: months.map(m => m.correct), backgroundColor: 'rgba(52,168,83,0.7)', borderRadius: 6 }
+        ]
+      },
+      options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } }, scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } } }
+    });
+
+    // Answer distribution chart
+    if (answerChart) answerChart.destroy();
+    answerChart = new Chart(document.getElementById('answerChart'), {
+      type: 'doughnut',
+      data: {
+        labels: ['Correct', 'Wrong', 'Unanswered'],
+        datasets: [{
+          data: [data.correctAnswers, data.wrongAnswers, Math.max(0, (data.activeStudents * data.publishedQuestions) - data.totalAnswers)],
+          backgroundColor: ['#34a853', '#ea4335', '#e0e0e0'],
+          borderWidth: 0
+        }]
+      },
+      options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } }, cutout: '65%' }
+    });
+
+    // Top students
+    const topStudents = data.topStudents || [];
+    document.getElementById('top-students-list').innerHTML = topStudents.length
+      ? `<table class="table" style="margin:0">
+          <thead><tr><th>#</th><th>Student</th><th>Class</th><th>Score</th></tr></thead>
+          <tbody>${topStudents.map((s, i) => `
+            <tr>
+              <td><span style="font-weight:700;color:${['#ffd700','#c0c0c0','#cd7f32'][i]||'var(--text-muted)'}">
+                ${i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `#${i+1}`}
+              </span></td>
+              <td>
+                <div style="display:flex;align-items:center;gap:8px">
+                  ${Utils.avatar(s.name, 32)}
+                  <div>
+                    <div style="font-weight:600;font-size:13px">${Utils.escapeHtml(s.name)}</div>
+                    <div style="font-size:11px;color:var(--text-muted)">${s.studentId}</div>
+                  </div>
+                </div>
+              </td>
+              <td><span class="badge badge-info">Class ${Utils.escapeHtml(s.class||'')}</span></td>
+              <td>
+                <div style="font-weight:700;color:var(--secondary)">${s.percentage}%</div>
+                <div style="font-size:11px;color:var(--text-muted)">${s.correct}/${s.attempted}</div>
+              </td>
+            </tr>`).join('')}
+          </tbody>
+        </table>`
+      : `<div class="empty-state"><div class="empty-icon">🏆</div><p>No submissions yet</p></div>`;
+
+    // Subject stats
+    const subjects = data.subjectStats || {};
+    const subjectEntries = Object.entries(subjects);
+    document.getElementById('subject-list').innerHTML = subjectEntries.length
+      ? `<div style="padding:8px 0">${subjectEntries.map(([sub, stat]) => {
+          const acc = stat.answers > 0 ? Math.round((stat.correct / stat.answers) * 100) : 0;
+          return `<div style="padding:12px 20px;border-bottom:1px solid var(--border)">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+              <div>
+                <span style="font-weight:600">${Utils.escapeHtml(sub)}</span>
+                <span style="font-size:12px;color:var(--text-muted);margin-left:8px">${stat.questions} questions</span>
+              </div>
+              <span style="font-weight:700;color:${acc>=70?'var(--secondary)':acc>=40?'#f57f17':'var(--danger)'}">${acc}%</span>
+            </div>
+            <div class="progress"><div class="progress-bar ${acc>=70?'success':acc>=40?'warning':'danger'}" style="width:${acc}%"></div></div>
+            <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--text-muted);margin-top:4px">
+              <span>${stat.answers} submissions</span>
+              <span>${stat.correct} correct</span>
+            </div>
+          </div>`;
+        }).join('')}</div>`
+      : `<div class="empty-state"><div class="empty-icon">📚</div><p>No subject data yet</p></div>`;
+
+  } catch (err) {
+    console.error(err);
+    Toast.error('Failed to load dashboard: ' + err.message);
+  }
+}
+
+loadDashboard();
+</script>
+</body>
+</html>

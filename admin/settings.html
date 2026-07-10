@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Settings — Admin</title>
+  <link rel="stylesheet" href="../assets/css/main.css">
+  <style>
+    .settings-grid { display:grid;grid-template-columns:240px 1fr;gap:24px; }
+    .settings-nav { display:flex;flex-direction:column;gap:4px; }
+    .settings-nav-item { padding:10px 14px;border-radius:8px;cursor:pointer;font-size:14px;font-weight:500;color:var(--text-muted);display:flex;align-items:center;gap:8px;transition:all 0.2s; }
+    .settings-nav-item:hover { background:var(--surface2);color:var(--text); }
+    .settings-nav-item.active { background:var(--primary-light);color:var(--primary);font-weight:600; }
+    .settings-section { display:none; }
+    .settings-section.active { display:block; }
+    @media (max-width:768px) { .settings-grid { grid-template-columns:1fr; } .settings-nav { flex-direction:row;flex-wrap:wrap; } }
+  </style>
+</head>
+<body>
+<div class="app-wrapper">
+  <aside class="sidebar" id="sidebar">
+    <a class="sidebar-brand" href="dashboard.html"><div class="brand-icon">🎓</div><div class="brand-text"><h1>Q&A System</h1><p>Admin Panel</p></div></a>
+    <nav class="sidebar-nav">
+      <span class="nav-section-label">Main</span>
+      <a class="nav-item" href="dashboard.html"><span class="nav-icon">📊</span> Dashboard</a>
+      <a class="nav-item" href="students.html"><span class="nav-icon">👥</span> Students</a>
+      <a class="nav-item" href="questions.html"><span class="nav-icon">❓</span> Questions</a>
+      <a class="nav-item" href="answers.html"><span class="nav-icon">✅</span> Answers</a>
+      <span class="nav-section-label">Analytics</span>
+      <a class="nav-item" href="reports.html"><span class="nav-icon">📈</span> Reports</a>
+      <span class="nav-section-label">System</span>
+      <a class="nav-item active" href="settings.html"><span class="nav-icon">⚙️</span> Settings</a>
+    </nav>
+    <div class="sidebar-footer">
+      <div style="display:flex;align-items:center;gap:10px">
+        <div class="user-avatar" data-user-avatar></div>
+        <div style="flex:1"><div style="font-size:13px;font-weight:600;color:white" data-user-name></div><div style="font-size:11px;opacity:0.7;color:white">Administrator</div></div>
+        <button onclick="Auth.logout('login.html')" style="background:rgba(255,255,255,0.15);border:none;color:white;border-radius:8px;padding:6px 8px;cursor:pointer;font-size:16px">🚪</button>
+      </div>
+    </div>
+  </aside>
+
+  <div class="main-content">
+    <header class="topbar">
+      <button class="topbar-btn" id="sidebar-toggle">☰</button>
+      <div class="topbar-title">Settings</div>
+      <div class="topbar-actions" style="margin-left:auto">
+        <button class="topbar-btn" id="theme-toggle">🌙</button>
+      </div>
+    </header>
+
+    <main class="page-content">
+      <div class="settings-grid">
+        <!-- Settings Nav -->
+        <div>
+          <div class="card">
+            <div class="card-body p-0">
+              <div class="settings-nav" style="padding:8px">
+                <div class="settings-nav-item active" onclick="showSection('general')">⚙️ General</div>
+                <div class="settings-nav-item" onclick="showSection('admin')">👤 Admin Account</div>
+                <div class="settings-nav-item" onclick="showSection('email')">📧 Email</div>
+                <div class="settings-nav-item" onclick="showSection('blogger')">📝 Blogger</div>
+                <div class="settings-nav-item" onclick="showSection('backup')">💾 Backup</div>
+                <div class="settings-nav-item" onclick="showSection('system')">🖥 System Info</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Settings Content -->
+        <div>
+          <!-- General -->
+          <div class="settings-section active card" id="section-general">
+            <div class="card-header"><div class="card-title">⚙️ General Settings</div></div>
+            <div class="card-body">
+              <div class="form-group">
+                <label class="form-label">School Name</label>
+                <input type="text" class="form-control" id="s-school-name" placeholder="My School">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Questions Per Page (Admin)</label>
+                <select class="form-control" id="s-q-per-page">
+                  <option value="10">10</option><option value="20">20</option><option value="50">50</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Students Per Page (Admin)</label>
+                <select class="form-control" id="s-s-per-page">
+                  <option value="10">10</option><option value="20">20</option><option value="50">50</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Session Duration (Hours)</label>
+                <select class="form-control" id="s-session-hours">
+                  <option value="1">1 hour</option>
+                  <option value="4">4 hours</option>
+                  <option value="8" selected>8 hours</option>
+                  <option value="24">24 hours</option>
+                </select>
+              </div>
+              <button class="btn btn-primary" onclick="saveSection('general')">Save General Settings</button>
+            </div>
+          </div>
+
+          <!-- Admin Account -->
+          <div class="settings-section card hidden" id="section-admin">
+            <div class="card-header"><div class="card-title">👤 Admin Account</div></div>
+            <div class="card-body">
+              <div class="form-group">
+                <label class="form-label">Admin Username</label>
+                <input type="text" class="form-control" id="s-admin-user" placeholder="admin">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Admin Email</label>
+                <input type="email" class="form-control" id="s-admin-email" placeholder="admin@school.edu">
+              </div>
+              <div class="divider"></div>
+              <div style="margin-bottom:12px;font-weight:600">Change Password</div>
+              <div class="form-group">
+                <label class="form-label">New Password</label>
+                <input type="password" class="form-control" id="s-admin-pwd" placeholder="Leave blank to keep current">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Confirm Password</label>
+                <input type="password" class="form-control" id="s-admin-pwd2" placeholder="Confirm new password">
+              </div>
+              <button class="btn btn-primary" onclick="saveSection('admin')">Update Account</button>
+            </div>
+          </div>
+
+          <!-- Email -->
+          <div class="settings-section card hidden" id="section-email">
+            <div class="card-header"><div class="card-title">📧 Email Notifications</div></div>
+            <div class="card-body">
+              <div class="form-group">
+                <label style="display:flex;align-items:center;gap:10px;cursor:pointer">
+                  <input type="checkbox" id="s-email-enabled" style="width:18px;height:18px;cursor:pointer">
+                  <span style="font-weight:600">Enable Email Notifications</span>
+                </label>
+                <p style="font-size:13px;color:var(--text-muted);margin-top:6px">Uses Gmail via Google Apps Script. Requires authorization.</p>
+              </div>
+              <div class="divider"></div>
+              <div style="font-weight:600;margin-bottom:12px">Test Email</div>
+              <div style="display:flex;gap:10px">
+                <input type="email" class="form-control" id="test-email-addr" placeholder="Enter email address" style="flex:1">
+                <button class="btn btn-secondary" onclick="sendTestEmail()">Send Test</button>
+              </div>
+              <button class="btn btn-primary" style="margin-top:16px" onclick="saveSection('email')">Save Email Settings</button>
+            </div>
+          </div>
+
+          <!-- Blogger -->
+          <div class="settings-section card hidden" id="section-blogger">
+            <div class="card-header"><div class="card-title">📝 Blogger Integration</div></div>
+            <div class="card-body">
+              <div style="background:#fef7e0;border-left:4px solid var(--warning);padding:12px 16px;border-radius:0 8px 8px 0;margin-bottom:16px;font-size:13px">
+                <strong>Setup Required:</strong> You need a Google Blogger account and the Blogger API enabled in your Apps Script project.
+              </div>
+              <div class="form-group">
+                <label style="display:flex;align-items:center;gap:10px;cursor:pointer">
+                  <input type="checkbox" id="s-blogger-enabled" style="width:18px;height:18px;cursor:pointer">
+                  <span style="font-weight:600">Enable Blogger Auto-Publish</span>
+                </label>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Blogger Blog ID</label>
+                <input type="text" class="form-control" id="s-blogger-id" placeholder="Your Blog ID from Blogger URL">
+                <div style="font-size:12px;color:var(--text-muted);margin-top:4px">Find it in: blogger.com → Settings → Basic → Blog ID</div>
+              </div>
+              <button class="btn btn-primary" onclick="saveSection('blogger')">Save Blogger Settings</button>
+            </div>
+          </div>
+
+          <!-- Backup -->
+          <div class="settings-section card hidden" id="section-backup">
+            <div class="card-header"><div class="card-title">💾 Data Backup</div></div>
+            <div class="card-body">
+              <p style="color:var(--text-muted);font-size:13px;margin-bottom:16px">Creates a copy of your Google Sheet in Google Drive with a timestamp.</p>
+              <div style="background:var(--surface2);border-radius:10px;padding:20px;text-align:center;margin-bottom:20px">
+                <div style="font-size:48px;margin-bottom:12px">🗄</div>
+                <div style="font-weight:600;margin-bottom:4px">Create Manual Backup</div>
+                <div style="font-size:13px;color:var(--text-muted)">Saves a timestamped copy to Google Drive</div>
+              </div>
+              <button class="btn btn-primary w-100" onclick="createBackup()">💾 Create Backup Now</button>
+              <div id="backup-result" style="margin-top:16px"></div>
+            </div>
+          </div>
+
+          <!-- System Info -->
+          <div class="settings-section card hidden" id="section-system">
+            <div class="card-header"><div class="card-title">🖥 System Information</div></div>
+            <div class="card-body">
+              <div style="display:grid;gap:12px">
+                <div style="display:flex;justify-content:space-between;padding:12px;background:var(--surface2);border-radius:8px">
+                  <span style="color:var(--text-muted)">System Version</span>
+                  <span style="font-weight:600">v1.0.0</span>
+                </div>
+                <div style="display:flex;justify-content:space-between;padding:12px;background:var(--surface2);border-radius:8px">
+                  <span style="color:var(--text-muted)">Backend</span>
+                  <span style="font-weight:600">Google Apps Script</span>
+                </div>
+                <div style="display:flex;justify-content:space-between;padding:12px;background:var(--surface2);border-radius:8px">
+                  <span style="color:var(--text-muted)">Database</span>
+                  <span style="font-weight:600">Google Sheets</span>
+                </div>
+                <div style="display:flex;justify-content:space-between;padding:12px;background:var(--surface2);border-radius:8px">
+                  <span style="color:var(--text-muted)">Frontend</span>
+                  <span style="font-weight:600">HTML5 / Bootstrap 5 / Chart.js</span>
+                </div>
+                <div style="display:flex;justify-content:space-between;padding:12px;background:var(--surface2);border-radius:8px">
+                  <span style="color:var(--text-muted)">Apps Script URL</span>
+                  <span style="font-weight:600;font-size:12px;max-width:200px;overflow:hidden;text-overflow:ellipsis">${CONFIG?.SCRIPT_URL || 'Not configured'}</span>
+                </div>
+              </div>
+
+              <div class="divider"></div>
+              <div style="font-weight:600;margin-bottom:12px">Quick Actions</div>
+              <div style="display:flex;gap:10px;flex-wrap:wrap">
+                <button class="btn btn-secondary" onclick="window.open('https://script.google.com','_blank')">Open Apps Script</button>
+                <button class="btn btn-secondary" onclick="window.open('https://sheets.google.com','_blank')">Open Sheets</button>
+                <button class="btn btn-secondary" onclick="window.open('https://blogger.com','_blank')">Open Blogger</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>
+
+<script src="../assets/js/config.js"></script>
+<script src="../assets/js/auth.js"></script>
+<script src="../assets/js/api.js"></script>
+<script>
+if (!Auth.requireAdmin()) throw new Error('Unauthorized');
+populateUserInfo();
+setupThemeToggle();
+Utils.setupSidebar();
+
+// Fix system info ${} template issue
+document.querySelector('[data-user-avatar]') && populateUserInfo();
+
+function showSection(id) {
+  document.querySelectorAll('.settings-section').forEach(el => el.classList.add('hidden'));
+  document.querySelectorAll('.settings-nav-item').forEach(el => el.classList.remove('active'));
+  document.getElementById('section-' + id).classList.remove('hidden');
+  event.target.classList.add('active');
+}
+
+async function loadSettings() {
+  try {
+    const s = await API.getSettings();
+    document.getElementById('s-school-name').value = s['SCHOOL_NAME'] || '';
+    document.getElementById('s-admin-user').value = s['ADMIN_USERNAME'] || '';
+    document.getElementById('s-admin-email').value = s['ADMIN_EMAIL'] || '';
+    document.getElementById('s-q-per-page').value = s['QUESTIONS_PER_PAGE'] || '10';
+    document.getElementById('s-s-per-page').value = s['STUDENTS_PER_PAGE'] || '20';
+    document.getElementById('s-session-hours').value = s['SESSION_HOURS'] || '8';
+    document.getElementById('s-email-enabled').checked = s['EMAIL_NOTIFICATIONS'] === 'true';
+    document.getElementById('s-blogger-enabled').checked = s['BLOGGER_ENABLED'] === 'true';
+    document.getElementById('s-blogger-id').value = s['BLOGGER_BLOG_ID'] || '';
+  } catch (err) {
+    Toast.error('Failed to load settings: ' + err.message);
+  }
+}
+
+async function saveSection(section) {
+  let settings = {};
+
+  if (section === 'general') {
+    settings = {
+      SCHOOL_NAME: document.getElementById('s-school-name').value,
+      QUESTIONS_PER_PAGE: document.getElementById('s-q-per-page').value,
+      STUDENTS_PER_PAGE: document.getElementById('s-s-per-page').value,
+      SESSION_HOURS: document.getElementById('s-session-hours').value
+    };
+  } else if (section === 'admin') {
+    const pwd = document.getElementById('s-admin-pwd').value;
+    const pwd2 = document.getElementById('s-admin-pwd2').value;
+    if (pwd && pwd !== pwd2) { Toast.error('Passwords do not match'); return; }
+    settings = {
+      ADMIN_USERNAME: document.getElementById('s-admin-user').value,
+      ADMIN_EMAIL: document.getElementById('s-admin-email').value
+    };
+    if (pwd) settings.ADMIN_PASSWORD = pwd;
+  } else if (section === 'email') {
+    settings = {
+      EMAIL_NOTIFICATIONS: document.getElementById('s-email-enabled').checked ? 'true' : 'false'
+    };
+  } else if (section === 'blogger') {
+    settings = {
+      BLOGGER_ENABLED: document.getElementById('s-blogger-enabled').checked ? 'true' : 'false',
+      BLOGGER_BLOG_ID: document.getElementById('s-blogger-id').value
+    };
+  }
+
+  try {
+    await API.updateSettings(settings);
+    Toast.success('Settings saved!');
+    if (section === 'admin') {
+      document.getElementById('s-admin-pwd').value = '';
+      document.getElementById('s-admin-pwd2').value = '';
+    }
+  } catch (err) {
+    Toast.error(err.message);
+  }
+}
+
+async function sendTestEmail() {
+  const email = document.getElementById('test-email-addr').value.trim();
+  if (!email) { Toast.warning('Enter an email address'); return; }
+  try {
+    await API.sendTestEmail(email);
+    Toast.success('Test email sent to ' + email);
+  } catch (err) {
+    Toast.error(err.message);
+  }
+}
+
+async function createBackup() {
+  Loading.show('Creating backup…');
+  const resultEl = document.getElementById('backup-result');
+  try {
+    const result = await API.createBackup();
+    resultEl.innerHTML = `<div style="background:#e6f4ea;padding:12px;border-radius:8px;color:#1b5e20">
+      ✅ Backup created!
+      ${result.data.backupUrl ? `<a href="${result.data.backupUrl}" target="_blank" style="display:block;margin-top:8px;font-size:13px">Open Backup →</a>` : ''}
+    </div>`;
+    Toast.success('Backup created successfully');
+  } catch (err) {
+    resultEl.innerHTML = `<div style="background:#fce8e6;padding:12px;border-radius:8px;color:#b71c1c">❌ ${err.message}</div>`;
+  } finally {
+    Loading.hide();
+  }
+}
+
+loadSettings();
+</script>
+</body>
+</html>
