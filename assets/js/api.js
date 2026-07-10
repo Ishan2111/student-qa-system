@@ -4,43 +4,39 @@
 
 const API = {
   // ── Core request ──────────────────────────────────────────────────────
-  async get(action, params = {}) {
+  // All requests use GET — GAS redirects POST and loses the body,
+  // making it impossible to read in doPost. GET params are safe over HTTPS
+  // and avoid all CORS preflight issues with GAS Web Apps.
+  async _fetch(action, params = {}, writePayload = null) {
     const token = Auth.getToken();
     const url = new URL(CONFIG.SCRIPT_URL);
     url.searchParams.set('action', action);
     if (token) url.searchParams.set('token', token);
+
+    // Read params go directly as individual query params
     Object.entries(params).forEach(([k, v]) => {
       if (v !== undefined && v !== null && v !== '') url.searchParams.set(k, v);
     });
 
-    const response = await fetch(url.toString(), {
-      method: 'GET',
-      redirect: 'follow'
-    });
+    // Write payload is JSON-encoded in a single 'payload' param
+    if (writePayload && Object.keys(writePayload).length > 0) {
+      url.searchParams.set('payload', JSON.stringify(writePayload));
+    }
 
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    const data = await response.json();
-    if (!data.success) throw new Error(data.error || 'API error');
-    return data.data;
-  },
-
-  async post(action, body = {}) {
-    const token = Auth.getToken();
-    const payload = { action, token, ...body };
-
-    // No Content-Type header — keeps it a "simple request" so the browser
-    // skips the CORS preflight that GAS cannot respond to.
-    // GAS reads the body via e.postData.contents regardless of Content-Type.
-    const response = await fetch(CONFIG.SCRIPT_URL, {
-      method: 'POST',
-      redirect: 'follow',
-      body: JSON.stringify(payload)
-    });
-
+    const response = await fetch(url.toString(), { redirect: 'follow' });
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const data = await response.json();
     if (!data.success) throw new Error(data.error || 'API error');
     return data;
+  },
+
+  async get(action, params = {}) {
+    const result = await this._fetch(action, params);
+    return result.data;
+  },
+
+  async post(action, body = {}) {
+    return this._fetch(action, {}, body);
   },
 
   // ── Auth ──────────────────────────────────────────────────────────────

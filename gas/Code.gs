@@ -3,11 +3,14 @@
  * Main Entry Point — Google Apps Script Web App
  *
  * Deploy as: Execute as "Me", Access: "Anyone"
+ *
+ * All requests come in as GET because GAS redirects POST and loses the body.
+ * Write payloads are JSON-encoded in the ?payload= URL parameter.
  */
 
 // ─── SPREADSHEET CONFIG ────────────────────────────────────────────────────
-var SPREADSHEET_ID = ''; // TODO: Replace with your Google Sheet ID
-var BLOGGER_BLOG_ID = ''; // TODO: Replace with your Blogger Blog ID
+var SPREADSHEET_ID = ''; // Replace with your Google Sheet ID
+var BLOGGER_BLOG_ID = ''; // Replace with your Blogger Blog ID
 
 var SHEETS = {
   STUDENTS: 'Student_Master',
@@ -18,17 +21,8 @@ var SHEETS = {
   REPORTS: 'Reports'
 };
 
-// ─── CORS HEADERS ──────────────────────────────────────────────────────────
-function getCorsHeaders() {
-  return {
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Methods': 'GET, POST',
-    'Access-Control-Allow-Headers': 'Content-Type, Authorization'
-  };
-}
-
-function makeResponse(data, statusCode) {
-  statusCode = statusCode || 200;
+// ─── RESPONSE HELPERS ─────────────────────────────────────────────────────
+function makeResponse(data) {
   var output = ContentService.createTextOutput(JSON.stringify(data));
   output.setMimeType(ContentService.MimeType.JSON);
   return output;
@@ -42,20 +36,48 @@ function error(message, code) {
   return makeResponse({ success: false, error: message, code: code || 400 });
 }
 
-// ─── MAIN ROUTER ──────────────────────────────────────────────────────────
+// ─── UNIFIED ROUTER (GET only) ────────────────────────────────────────────
 function doGet(e) {
   var action = e.parameter.action || '';
-  var token = e.parameter.token || '';
+  var token  = e.parameter.token  || '';
+
+  // Parse optional write payload
+  var p = {};
+  try {
+    if (e.parameter.payload) p = JSON.parse(e.parameter.payload);
+  } catch (err) { /* malformed payload — p stays {} */ }
 
   try {
     switch (action) {
+
+      // ── System ──────────────────────────────────────────────────────────
       case 'ping':
         return success({ timestamp: new Date().toISOString() }, 'System online');
 
+      // ── Auth ─────────────────────────────────────────────────────────────
+      case 'adminLogin':
+        return adminLogin(p.username, p.password);
+
+      case 'studentLogin':
+        return studentLogin(p.identifier, p.password);
+
+      case 'logout':
+        return logout(token);
+
+      case 'changePassword':
+        if (!validateToken(token)) return error('Unauthorized', 401);
+        return changePassword(p.studentId, p.oldPassword, p.newPassword);
+
+      case 'resetPassword':
+        if (!validateAdminToken(token)) return error('Unauthorized', 401);
+        return resetStudentPassword(p.studentId);
+
+      // ── Dashboard ─────────────────────────────────────────────────────────
       case 'dashboard':
         if (!validateToken(token)) return error('Unauthorized', 401);
         return getDashboardData();
 
+      // ── Students ─────────────────────────────────────────────────────────
       case 'students':
         if (!validateToken(token)) return error('Unauthorized', 401);
         return getStudents(e.parameter);
@@ -64,6 +86,39 @@ function doGet(e) {
         if (!validateToken(token)) return error('Unauthorized', 401);
         return getStudent(e.parameter.id);
 
+      case 'addStudent':
+        if (!validateAdminToken(token)) return error('Unauthorized', 401);
+        return addStudent(p.student);
+
+      case 'updateStudent':
+        if (!validateAdminToken(token)) return error('Unauthorized', 401);
+        return updateStudent(p.student);
+
+      case 'deleteStudent':
+        if (!validateAdminToken(token)) return error('Unauthorized', 401);
+        return deleteStudent(p.studentId);
+
+      case 'toggleStudentStatus':
+        if (!validateAdminToken(token)) return error('Unauthorized', 401);
+        return toggleStudentStatus(p.studentId);
+
+      case 'importStudents':
+        if (!validateAdminToken(token)) return error('Unauthorized', 401);
+        return importStudents(p.students);
+
+      case 'updateProfile':
+        if (!validateToken(token)) return error('Unauthorized', 401);
+        return updateStudentProfile(p.studentId, p.profile);
+
+      case 'progress':
+        if (!validateToken(token)) return error('Unauthorized', 401);
+        return getStudentProgress(e.parameter.studentId);
+
+      case 'exportStudents':
+        if (!validateAdminToken(token)) return error('Unauthorized', 401);
+        return exportStudentsCSV();
+
+      // ── Questions ─────────────────────────────────────────────────────────
       case 'questions':
         if (!validateToken(token)) return error('Unauthorized', 401);
         return getQuestions(e.parameter);
@@ -71,25 +126,52 @@ function doGet(e) {
       case 'todayQuestion':
         return getTodayQuestion(e.parameter.studentId);
 
+      case 'addQuestion':
+        if (!validateAdminToken(token)) return error('Unauthorized', 401);
+        return addQuestion(p.question);
+
+      case 'updateQuestion':
+        if (!validateAdminToken(token)) return error('Unauthorized', 401);
+        return updateQuestion(p.question);
+
+      case 'deleteQuestion':
+        if (!validateAdminToken(token)) return error('Unauthorized', 401);
+        return deleteQuestion(p.questionId);
+
+      case 'publishToBlogger':
+        if (!validateAdminToken(token)) return error('Unauthorized', 401);
+        return publishQuestionToBlogger(p.questionId);
+
+      // ── Answers ───────────────────────────────────────────────────────────
+      case 'submitAnswer':
+        if (!validateToken(token)) return error('Unauthorized', 401);
+        return submitAnswer(p.answer);
+
       case 'studentAnswers':
         if (!validateToken(token)) return error('Unauthorized', 401);
         return getStudentAnswers(e.parameter.studentId);
 
-      case 'progress':
-        if (!validateToken(token)) return error('Unauthorized', 401);
-        return getStudentProgress(e.parameter.studentId);
-
+      // ── Reports ───────────────────────────────────────────────────────────
       case 'reports':
         if (!validateToken(token)) return error('Unauthorized', 401);
         return generateReport(e.parameter);
 
+      // ── Settings ──────────────────────────────────────────────────────────
       case 'settings':
         if (!validateAdminToken(token)) return error('Unauthorized', 401);
         return getSettings();
 
-      case 'exportStudents':
+      case 'updateSettings':
         if (!validateAdminToken(token)) return error('Unauthorized', 401);
-        return exportStudentsCSV();
+        return updateSettings(p.settings);
+
+      case 'sendTestEmail':
+        if (!validateAdminToken(token)) return error('Unauthorized', 401);
+        return sendTestEmail(p.email);
+
+      case 'createBackup':
+        if (!validateAdminToken(token)) return error('Unauthorized', 401);
+        return createBackup();
 
       default:
         return error('Unknown action: ' + action, 404);
@@ -100,105 +182,9 @@ function doGet(e) {
   }
 }
 
+// Keep doPost as a no-op stub (GAS requires it to be defined for POST deploys)
 function doPost(e) {
-  var body = {};
-  try {
-    body = JSON.parse(e.postData.contents);
-  } catch (err) {
-    return error('Invalid JSON body');
-  }
-
-  var action = body.action || '';
-  var token = body.token || '';
-
-  try {
-    switch (action) {
-
-      // ── Auth ──
-      case 'adminLogin':
-        return adminLogin(body.username, body.password);
-
-      case 'studentLogin':
-        return studentLogin(body.identifier, body.password);
-
-      case 'logout':
-        return logout(token);
-
-      case 'changePassword':
-        if (!validateToken(token)) return error('Unauthorized', 401);
-        return changePassword(body.studentId, body.oldPassword, body.newPassword);
-
-      case 'resetPassword':
-        if (!validateAdminToken(token)) return error('Unauthorized', 401);
-        return resetStudentPassword(body.studentId);
-
-      // ── Students ──
-      case 'addStudent':
-        if (!validateAdminToken(token)) return error('Unauthorized', 401);
-        return addStudent(body.student);
-
-      case 'updateStudent':
-        if (!validateAdminToken(token)) return error('Unauthorized', 401);
-        return updateStudent(body.student);
-
-      case 'deleteStudent':
-        if (!validateAdminToken(token)) return error('Unauthorized', 401);
-        return deleteStudent(body.studentId);
-
-      case 'toggleStudentStatus':
-        if (!validateAdminToken(token)) return error('Unauthorized', 401);
-        return toggleStudentStatus(body.studentId);
-
-      case 'importStudents':
-        if (!validateAdminToken(token)) return error('Unauthorized', 401);
-        return importStudents(body.students);
-
-      case 'updateProfile':
-        if (!validateToken(token)) return error('Unauthorized', 401);
-        return updateStudentProfile(body.studentId, body.profile);
-
-      // ── Questions ──
-      case 'addQuestion':
-        if (!validateAdminToken(token)) return error('Unauthorized', 401);
-        return addQuestion(body.question);
-
-      case 'updateQuestion':
-        if (!validateAdminToken(token)) return error('Unauthorized', 401);
-        return updateQuestion(body.question);
-
-      case 'deleteQuestion':
-        if (!validateAdminToken(token)) return error('Unauthorized', 401);
-        return deleteQuestion(body.questionId);
-
-      case 'publishToBlogger':
-        if (!validateAdminToken(token)) return error('Unauthorized', 401);
-        return publishQuestionToBlogger(body.questionId);
-
-      // ── Answers ──
-      case 'submitAnswer':
-        if (!validateToken(token)) return error('Unauthorized', 401);
-        return submitAnswer(body.answer);
-
-      // ── Settings ──
-      case 'updateSettings':
-        if (!validateAdminToken(token)) return error('Unauthorized', 401);
-        return updateSettings(body.settings);
-
-      case 'sendTestEmail':
-        if (!validateAdminToken(token)) return error('Unauthorized', 401);
-        return sendTestEmail(body.email);
-
-      case 'createBackup':
-        if (!validateAdminToken(token)) return error('Unauthorized', 401);
-        return createBackup();
-
-      default:
-        return error('Unknown action: ' + action, 404);
-    }
-  } catch (err) {
-    logError('doPost', err);
-    return error('Server error: ' + err.message, 500);
-  }
+  return doGet(e);
 }
 
 // ─── SPREADSHEET HELPERS ──────────────────────────────────────────────────
@@ -212,9 +198,7 @@ function getSpreadsheet() {
 function getSheet(name) {
   var ss = getSpreadsheet();
   var sheet = ss.getSheetByName(name);
-  if (!sheet) {
-    sheet = createSheet(name);
-  }
+  if (!sheet) sheet = createSheet(name);
   return sheet;
 }
 
@@ -263,26 +247,19 @@ function sheetToObjects(sheet) {
   var headers = data[0];
   return data.slice(1).map(function(row) {
     var obj = {};
-    headers.forEach(function(h, i) {
-      obj[h] = row[i];
-    });
+    headers.forEach(function(h, i) { obj[h] = row[i]; });
     return obj;
   });
 }
 
 function logError(context, err) {
-  try {
-    Logger.log('[ERROR][' + context + '] ' + err.message + '\n' + err.stack);
-  } catch (e) {}
+  try { Logger.log('[ERROR][' + context + '] ' + err.message); } catch (e) {}
 }
 
 // ─── INITIALIZATION ───────────────────────────────────────────────────────
 function initializeSystem() {
-  Object.keys(SHEETS).forEach(function(key) {
-    getSheet(SHEETS[key]);
-  });
+  Object.keys(SHEETS).forEach(function(key) { getSheet(SHEETS[key]); });
 
-  // Default settings
   var settingsSheet = getSheet(SHEETS.SETTINGS);
   var existing = sheetToObjects(settingsSheet);
   var keys = existing.map(function(r) { return r['Key']; });
