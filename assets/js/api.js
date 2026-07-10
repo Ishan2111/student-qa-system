@@ -15,7 +15,7 @@ const API = {
 
     const response = await fetch(url.toString(), {
       method: 'GET',
-      cache: 'no-cache'
+      redirect: 'follow'
     });
 
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
@@ -28,9 +28,12 @@ const API = {
     const token = Auth.getToken();
     const payload = { action, token, ...body };
 
+    // No Content-Type header — keeps it a "simple request" so the browser
+    // skips the CORS preflight that GAS cannot respond to.
+    // GAS reads the body via e.postData.contents regardless of Content-Type.
     const response = await fetch(CONFIG.SCRIPT_URL, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      redirect: 'follow',
       body: JSON.stringify(payload)
     });
 
