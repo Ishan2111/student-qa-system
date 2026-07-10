@@ -5,7 +5,7 @@
 
 const CONFIG = {
   // TODO: Replace with your deployed Apps Script Web App URL
-  SCRIPT_URL: 'https://script.google.com/macros/s/YOUR_SCRIPT_ID/exec',
+  SCRIPT_URL: 'https://script.google.com/macros/s/AKfycbyo97aY0cEzt_aUPtHo0cIgXvHCvw_0agzs4uqSLDf4DH7bxhysO_9Y_l9huqRLT7Z2/exec',
 
   SCHOOL_NAME: 'My School',
   VERSION: '1.0.0',
